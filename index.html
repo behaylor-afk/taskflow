@@ -296,6 +296,7 @@ var tasks        = [];
 var appointments = {};
 var completions  = {};
 var curFilter    = "due";
+var expandedTasks = {}; // taskId -> true/false
 var editingId    = null;
 
 function todayStr() { return new Date().toISOString().slice(0,10); }
@@ -484,6 +485,11 @@ function spawnNextOccurrence(task) {
   }
 }
 
+function toggleExpand(taskId) {
+  expandedTasks[taskId] = !expandedTasks[taskId];
+  renderTasks();
+}
+
 function toggleSubtask(taskId, subtaskId) {
   var task = tasks.find(function(t){return t.id===taskId;});
   if (!task || !task.subtasks) return;
@@ -636,16 +642,23 @@ function renderTasks() {
     var recBadge=(task.recurrence!=="none"&&!done2)?'<span class="rec-badge">'+recLabel(task.recurrence)+'</span>':"";
     var prog = getSubtaskProgress(task);
     var progBadge = "";
+    var hasSubtasks = task.subtasks && task.subtasks.length > 0;
+    var isExpanded = !!expandedTasks[task.id];
     if (prog) {
       var allDone = prog.done === prog.total;
       progBadge = '<span class="progress-badge'+(allDone?" complete":"")+'">'+prog.done+'/'+prog.total+'</span>';
     }
+    // Expand/collapse toggle shown only if task has subtasks
+    var expandBtn = hasSubtasks
+      ? '<button class="expand-btn" data-id="'+task.id+'" title="'+(isExpanded?"Hide":"Show")+' subtasks" style="background:none;border:none;cursor:pointer;padding:0 0 0 .3rem;color:var(--color-text-tertiary);font-size:12px;vertical-align:middle">'
+        +'<i class="ti ti-chevron-'+(isExpanded?"up":"down")+'" aria-hidden="true"></i></button>'
+      : "";
     // Parent is only truly done if all subtasks are also done
     var effectiveDone = done2 && allSubtasksDone(task);
     var chkClass = effectiveDone ? "chkbox checked" : "chkbox";
     rows+='<tr class="'+rowCls+'">'
       +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<i class="ti ti-check" aria-hidden="true"></i>':'')+'</button></td>'
-      +'<td class="td-name">'+eh(task.name)+recBadge+progBadge+'</td>'
+      +'<td class="td-name">'+eh(task.name)+recBadge+progBadge+expandBtn+'</td>'
       +'<td class="td-ent">'+eh(task.entity||"")+'</td>'
       +'<td class="td-start">'+fmtDate(task.startDate)+'</td>'
       +'<td class="td-due"><span class="'+chipCls+'">'+fmtDate(task.dueDate)+'</span></td>'
@@ -653,8 +666,8 @@ function renderTasks() {
       +'<button class="act-btn edit-btn" data-id="'+task.id+'" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button>'
       +'<button class="act-btn del" data-id="'+task.id+'" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button>'
       +'</div></td></tr>';
-    // Render subtask rows
-    if (task.subtasks && task.subtasks.length > 0) {
+    // Render subtask rows only when expanded
+    if (hasSubtasks && isExpanded) {
       for (var si = 0; si < task.subtasks.length; si++) {
         var st = task.subtasks[si];
         var stDone = isSubtaskDone(st);
@@ -689,6 +702,9 @@ function renderTasks() {
 function renderAll() { renderWeek(); renderTasks(); }
 
 document.getElementById("task-area").addEventListener("click",function(e){
+  // Expand/collapse toggle
+  var expBtn=e.target.closest(".expand-btn");
+  if(expBtn){ toggleExpand(expBtn.getAttribute("data-id")); return; }
   // Subtask checkbox
   var stChk=e.target.closest(".subtask-chk");
   if(stChk){ toggleSubtask(stChk.getAttribute("data-taskid"), stChk.getAttribute("data-stid")); return; }
