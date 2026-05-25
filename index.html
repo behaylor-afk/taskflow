@@ -255,7 +255,7 @@ tbody tr.row-done{opacity:.5}
 </div>
 
 <script>
-var API_URL = "https://script.google.com/macros/s/AKfycbwEXUjwa8iQVejUSoCIc1mA_kMVON2VRwZTKjE12Ezjn6MU6sJeUFmFckQ6n2Ky6iGT/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbx0_zHYM_ve3K9OZj-ITXo0E6zEJBENeUOS1KfRaLxTH-H6-Tfqy9dxP8pPF0c3Z9JK/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -327,16 +327,47 @@ function setSync(state, msg) {
   lbl.textContent=msg||(state==="syncing"?"Saving...":state==="error"?"Sync error":"Synced");
 }
 
+// JSONP GET — bypasses CORS entirely, works on all browsers/devices
 function apiGet() {
-  if(NO_API) return Promise.resolve(null);
-  return fetch(API_URL+"?t="+Date.now(),{redirect:"follow"}).then(function(r){return r.json();}).catch(function(){return null;});
+  if (NO_API) return Promise.resolve(null);
+  return new Promise(function(resolve) {
+    var cb   = "tfcb_" + Date.now();
+    var script = document.createElement("script");
+    var done = false;
+    var timer = setTimeout(function() {
+      if (!done) { done=true; delete window[cb]; script.remove(); resolve(null); }
+    }, 12000);
+    window[cb] = function(data) {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; script.remove(); resolve(data); }
+    };
+    script.onerror = function() {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; resolve(null); }
+    };
+    script.src = API_URL + "?callback=" + cb + "&t=" + Date.now();
+    document.head.appendChild(script);
+  });
 }
 
+// Write via GET with payload param — no preflight, no CORS issue
 function apiPost(body) {
-  if(NO_API) return Promise.resolve(null);
+  if (NO_API) return Promise.resolve(null);
   setSync("syncing");
-  var url=API_URL+"?payload="+encodeURIComponent(JSON.stringify(body))+"&t="+Date.now();
-  return fetch(url,{redirect:"follow"}).then(function(r){return r.json();}).then(function(j){setSync(j&&j.ok?"idle":"error");return j;}).catch(function(){setSync("error","Offline");return null;});
+  return new Promise(function(resolve) {
+    var cb   = "tfwcb_" + Date.now();
+    var script = document.createElement("script");
+    var done = false;
+    var timer = setTimeout(function() {
+      if (!done) { done=true; delete window[cb]; script.remove(); setSync("error","Offline"); resolve(null); }
+    }, 12000);
+    window[cb] = function(data) {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
+    };
+    script.onerror = function() {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
+    };
+    script.src = API_URL + "?callback=" + cb + "&payload=" + encodeURIComponent(JSON.stringify(body)) + "&t=" + Date.now();
+    document.head.appendChild(script);
+  });
 }
 
 function localSave() {
