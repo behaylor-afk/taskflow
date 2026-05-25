@@ -225,7 +225,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  CONFIGURATION — paste your Apps Script Web App URL below
 // ═══════════════════════════════════════════════════════════════
-const API_URL = "https://script.google.com/macros/s/AKfycbyudzhXkKYIygxz1nFS9JRjKyFnuqmy0qtcDpWCWnpKD4A4ags1Y5qtzgImaTBntrMv/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwEXUjwa8iQVejUSoCIc1mA_kMVON2VRwZTKjE12Ezjn6MU6sJeUFmFckQ6n2Ky6iGT/exec";
 // ═══════════════════════════════════════════════════════════════
 
 // ── State ──────────────────────────────────────────────────────
@@ -305,29 +305,56 @@ function setSyncStatus(s, msg) {
 const NO_API = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 async function apiGet() {
-  if (NO_API) return null;
-  try {
-    const r = await fetch(API_URL + "?t=" + Date.now());
-    return await r.json();
-  } catch(e) { return null; }
+  if (NO_API) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const cbName = "tfcb_" + Date.now();
+    const script = document.createElement("script");
+    let done = false;
+    window[cbName] = (data) => {
+      done = true;
+      delete window[cbName];
+      script.remove();
+      resolve(data);
+    };
+    script.src = API_URL + "?callback=" + cbName + "&t=" + Date.now();
+    script.onerror = () => { if(!done){ delete window[cbName]; script.remove(); resolve(null); } };
+    setTimeout(() => { if(!done){ delete window[cbName]; script.remove(); resolve(null); } }, 12000);
+    document.head.appendChild(script);
+  });
 }
 
-async function apiPost(body) {
-  if (NO_API) return null;
-  try {
-    setSyncStatus("syncing");
-    const r = await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    const j = await r.json();
-    if (j.ok) setSyncStatus("idle");
-    else      setSyncStatus("error", "Sync error");
-    return j;
-  } catch(e) {
-    setSyncStatus("error", "Offline");
-    return null;
-  }
+function apiPost(body) {
+  if (NO_API) return Promise.resolve(null);
+  setSyncStatus("syncing");
+  return new Promise((resolve) => {
+    const iframeName = "tf_iframe_" + Date.now();
+    const iframe = document.createElement("iframe");
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = API_URL;
+    form.target = iframeName;
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = JSON.stringify(body);
+    form.appendChild(input);
+    document.body.appendChild(form);
+    iframe.onload = () => {
+      setSyncStatus("idle");
+      form.remove();
+      setTimeout(() => iframe.remove(), 500);
+      resolve({ ok: true });
+    };
+    setTimeout(() => {
+      setSyncStatus("error", "Offline");
+      try { form.remove(); iframe.remove(); } catch(e){}
+      resolve(null);
+    }, 12000);
+    form.submit();
+  });
 }
 
 // ── Local Storage fallback ─────────────────────────────────────
