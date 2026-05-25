@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>TaskFlow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; min-height: 100vh; font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif; background: #F0F4F4; color: #1A2E2E; -webkit-tap-highlight-color: transparent; }
+    input, select, button, textarea { font-family: inherit; }
+    button { cursor: pointer; border: none; background: none; transition: opacity .12s, filter .12s; }
+    button:hover { opacity: .85; }
+    button:active { opacity: .7; }
+    input::placeholder { color: #B0C8C8; }
+    input[type=date]::-webkit-calendar-picker-indicator { opacity: .5; cursor: pointer; }
+    select option { background: #fff; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-thumb { background: #C8D8D8; border-radius: 3px; }
+
+    /* ── Animations ── */
+    @keyframes slideUp   { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
+    @keyframes spin      { to { transform: rotate(360deg); } }
+
+    /* ── Layout ── */
+    #app { min-height: 100vh; }
+
+    /* ── Week Strip ── */
+    #week-strip { background: #F0F4F4; border-bottom: 1px solid #D1E0E0; padding: .875rem 1rem 1rem; }
+    #week-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .65rem; }
+    .brand { display: flex; align-items: center; gap: .6rem; }
+    .brand-icon { width: 30px; height: 30px; background: #2D6A6A; border-radius: .4rem; display: flex; align-items: center; justify-content: center; }
+    .brand-name { font-size: 1.15rem; font-weight: 900; letter-spacing: -.02em; color: #2D6A6A; }
+    .week-label { text-align: right; }
+    .week-label-top { font-size: .7rem; font-weight: 700; color: #2D6A6A; text-transform: uppercase; letter-spacing: .08em; }
+    .week-label-month { font-size: .8rem; font-weight: 600; color: #4A6060; }
+    #week-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: .45rem; height: clamp(160px,26vh,280px); }
+
+    /* Day Column */
+    .day-col { display: flex; flex-direction: column; background: #fff; border: 1px solid #D1E0E0; border-radius: .5rem; overflow: hidden; min-height: 0; }
+    .day-col.today { background: #E8F2F2; border: 2px solid #2D6A6A; }
+    .day-header { padding: .45rem .4rem .4rem; text-align: center; flex-shrink: 0; }
+    .day-col:not(.today) .day-header { background: #4A9090; }
+    .day-col.past .day-header { background: #B2C8C8; }
+    .day-col.today .day-header { background: #2D6A6A; }
+    .day-label { font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.8); }
+    .day-num { width: 24px; height: 24px; margin: .15rem auto 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 800; color: #fff; font-family: monospace; }
+    .day-col.today .day-num { background: rgba(255,255,255,.25); }
+    .appt-list { flex: 1; overflow-y: auto; padding: .35rem .35rem .25rem; }
+    .appt-empty { font-size: .58rem; color: #D1E0E0; text-align: center; padding: .6rem 0; user-select: none; }
+    .appt-item { display: flex; align-items: flex-start; gap: .25rem; padding: .25rem .3rem; margin-bottom: .2rem; background: #F7FAFA; border-radius: .3rem; border: 1px solid #D1E0E0; }
+    .day-col.today .appt-item { background: rgba(45,106,106,.08); border-color: rgba(45,106,106,.15); }
+    .appt-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; margin-top: .27rem; background: #7A9090; }
+    .day-col.today .appt-dot { background: #2D6A6A; }
+    .appt-text { flex: 1; font-size: .65rem; line-height: 1.35; color: #1A2E2E; word-break: break-word; }
+    .day-col.past .appt-text { color: #7A9090; }
+    .appt-del { background: none; border: none; padding: 0; opacity: .4; display: flex; align-items: center; flex-shrink: 0; }
+    .appt-input-row { border-top: 1px solid #D1E0E0; padding: .3rem .35rem; flex-shrink: 0; display: flex; gap: .2rem; align-items: center; }
+    .day-col.today .appt-input-row { border-top-color: rgba(45,106,106,.2); background: rgba(45,106,106,.04); }
+    .appt-input { flex: 1; background: transparent; border: none; color: #1A2E2E; font-size: .68rem; outline: none; padding: .1rem 0; min-width: 0; }
+    .appt-add-btn { background: #2D6A6A; border-radius: 3px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    /* ── Controls Bar ── */
+    #controls { background: rgba(240,244,244,.96); border-bottom: 1px solid #D1E0E0; padding: .5rem 1rem; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
+    #controls-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .today-str { font-size: .72rem; color: #7A9090; font-weight: 600; white-space: nowrap; }
+    .filter-btns { display: flex; gap: .2rem; }
+    .filter-btn { padding: .3rem .75rem; border-radius: .35rem; font-size: .72rem; font-weight: 700; border: 1.5px solid #D1E0E0; color: #4A6060; background: transparent; white-space: nowrap; }
+    .filter-btn.active { background: #2D6A6A; border-color: #2D6A6A; color: #fff; }
+    .new-task-btn { background: #2D6A6A; color: #fff; border-radius: .4rem; padding: .4rem .9rem; font-size: .775rem; font-weight: 700; display: flex; align-items: center; gap: .35rem; box-shadow: 0 2px 8px rgba(45,106,106,.3); flex-shrink: 0; }
+    .sync-indicator { font-size: .65rem; color: #7A9090; display: flex; align-items: center; gap: .3rem; }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ADE80; }
+    .sync-dot.syncing { background: #F59E0B; animation: spin 1s linear infinite; border-radius: 0; clip-path: none; width: 8px; height: 8px; border: 2px solid #F59E0B; border-top-color: transparent; border-radius: 50%; }
+    .sync-dot.error { background: #EF4444; }
+
+    /* ── Task Sections ── */
+    #task-area { padding: 1rem 1rem 2rem; }
+    .section { margin-bottom: 1.25rem; border-radius: .5rem; overflow: hidden; box-shadow: 0 2px 8px rgba(45,106,106,.1); border: 1px solid #D1E0E0; }
+    .section-header { padding: .5rem .875rem; }
+    .section-title-row { padding: .35rem .875rem; }
+    .section-title { color: #fff; font-weight: 800; font-size: .875rem; opacity: .9; }
+    .section-col-heads { display: grid; grid-template-columns: 36px 1fr 140px 100px 110px 64px; }
+    .col-head { padding: .5rem .75rem; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #fff; border-right: 1px solid rgba(255,255,255,.12); white-space: nowrap; }
+    .col-head:last-child { border-right: none; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .55rem .75rem; vertical-align: middle; }
+    tbody tr { transition: background .1s; }
+    tbody tr:nth-child(even) { background: #F7FAFA; }
+    tbody tr:hover { background: #EEF5F5; }
+    tbody tr.overdue-row { background: #FDF0EE; }
+    tbody tr.overdue-row:nth-child(even) { background: #FAE8E5; }
+    tbody tr.today-row { background: #EAF2FF; }
+    tbody tr.today-row:nth-child(even) { background: #E2EDFA; }
+    tbody tr.done-row { background: #F5F5F5; opacity: .75; }
+    td { border-bottom: 1px solid #D1E0E0; font-size: .8rem; }
+    .td-check { width: 36px; text-align: center; padding-left: .5rem; padding-right: 0; }
+    .td-name { font-weight: 600; color: #1A2E2E; }
+    .done-row .td-name { text-decoration: line-through; color: #888; font-weight: 400; }
+    .td-entity { color: #4A6060; width: 140px; }
+    .td-start { color: #7A9090; width: 100px; font-family: monospace; font-size: .75rem; }
+    .td-due { width: 110px; }
+    .due-chip { display: inline-block; padding: .15rem .45rem; border-radius: 4px; font-family: monospace; font-size: .75rem; }
+    .due-chip.overdue { background: #FADBD8; color: #C0392B; font-weight: 700; }
+    .due-chip.today { background: #D6EAF8; color: #1A5276; font-weight: 700; }
+    .td-actions { width: 64px; text-align: right; padding-right: .6rem; }
+    .action-btns { display: flex; gap: .25rem; justify-content: flex-end; }
+    .action-btn { background: transparent; border: 1px solid #D1E0E0; border-radius: 4px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+    .recurrence-badge { display: inline-block; margin-left: .4rem; font-size: .6rem; font-weight: 700; color: #4A9090; background: #E8F2F2; padding: .1rem .35rem; border-radius: 3px; text-transform: uppercase; letter-spacing: .05em; vertical-align: middle; }
+    .checkbox { border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: #7A9090; }
+    .empty-icon { font-size: 2rem; margin-bottom: .5rem; color: #D1E0E0; }
+    .setup-banner { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: .5rem; padding: 1rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: .75rem; }
+    .setup-banner svg { flex-shrink: 0; margin-top: 2px; }
+
+    /* ── Modal ── */
+    .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(10,30,30,.45); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn .15s ease; }
+    .modal-box { background: #fff; border-radius: .75rem; padding: 2rem; width: 100%; max-width: 500px; box-shadow: 0 20px 60px rgba(10,30,30,.25); animation: slideUp .22s ease; border: 1px solid #D1E0E0; }
+    .modal-title { color: #2D6A6A; font-size: 1.1rem; font-weight: 800; letter-spacing: -.01em; margin-bottom: 1.25rem; }
+    .form-grid { display: grid; gap: .875rem; }
+    .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .form-label { display: block; color: #4A6060; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .3rem; }
+    .form-input { width: 100%; background: #F8FBFB; border: 1.5px solid #D1E0E0; border-radius: .45rem; color: #1A2E2E; padding: .55rem .75rem; font-size: .875rem; outline: none; transition: border-color .15s; }
+    .form-input:focus { border-color: #2D6A6A; }
+    .form-actions { display: flex; gap: .6rem; margin-top: 1.5rem; justify-content: flex-end; }
+    .btn-cancel { background: transparent; border: 1.5px solid #D1E0E0; color: #4A6060; border-radius: .4rem; padding: .5rem 1.1rem; font-size: .825rem; font-weight: 600; }
+    .btn-save { background: #2D6A6A; color: #fff; border-radius: .4rem; padding: .5rem 1.25rem; font-size: .825rem; font-weight: 700; }
+    .btn-delete-confirm { background: #C0392B; color: #fff; border-radius: .4rem; padding: .5rem 1.1rem; font-size: .825rem; font-weight: 700; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .td-entity, .td-start { display: none; }
+      .section-col-heads { grid-template-columns: 36px 1fr 110px 64px; }
+      .col-head.hide-sm { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="week-strip">
+    <div id="week-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <span class="brand-name">TaskFlow</span>
+      </div>
+      <div class="week-label">
+        <div class="week-label-top">Week of</div>
+        <div class="week-label-month" id="month-label"></div>
+      </div>
+    </div>
+    <div id="week-grid"></div>
+  </div>
+
+  <div id="controls">
+    <div id="controls-inner">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <span class="today-str" id="today-str"></span>
+        <div class="filter-btns">
+          <button class="filter-btn active" data-filter="due" onclick="setFilter('due')">Due Today or Prior</button>
+          <button class="filter-btn" data-filter="all" onclick="setFilter('all')">All Tasks</button>
+        </div>
+        <div class="sync-indicator">
+          <div class="sync-dot" id="sync-dot"></div>
+          <span id="sync-label">Loading…</span>
+        </div>
+      </div>
+      <button class="new-task-btn" onclick="openModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        New Task
+      </button>
+    </div>
+  </div>
+
+  <div id="task-area"></div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">New Task</div>
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Task Name</label>
+        <input class="form-input" id="f-name" placeholder="Describe the task…" />
+      </div>
+      <div>
+        <label class="form-label">Entity / Client</label>
+        <input class="form-input" id="f-entity" placeholder="Who is this for?" />
+      </div>
+      <div class="form-row2">
+        <div>
+          <label class="form-label">Start Date</label>
+          <input class="form-input" type="date" id="f-start" />
+        </div>
+        <div>
+          <label class="form-label">Due Date</label>
+          <input class="form-input" type="date" id="f-due" />
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Recurrence</label>
+        <select class="form-input" id="f-recurrence">
+          <option value="none">One-Time</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Bi-Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIGURATION — paste your Apps Script Web App URL below
+// ═══════════════════════════════════════════════════════════════
+const API_URL = "https://script.google.com/macros/s/AKfycbyudzhXkKYIygxz1nFS9JRjKyFnuqmy0qtcDpWCWnpKD4A4ags1Y5qtzgImaTBntrMv/exec";
+// ═══════════════════════════════════════════════════════════════
+
+// ── State ──────────────────────────────────────────────────────
+let tasks        = [];
+let appointments = {}; // { "YYYY-MM-DD": ["appt1","appt2"] }
+let completions  = {}; // { "id|YYYY-MM-DD": true }  — stored locally too
+let currentFilter = "due";
+let editingId     = null;
+let syncStatus    = "idle"; // idle | syncing | error
+
+// ── Date Helpers ───────────────────────────────────────────────
+function today() { return new Date().toISOString().slice(0,10); }
+
+function getWeekDays() {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + diff);
+  return Array.from({length:7},(_,i) => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d.toISOString().slice(0,10);
+  });
+}
+
+function nextDue(task) {
+  if (task.recurrence === "none") return task.dueDate;
+  const t = new Date(today());
+  let d   = new Date(task.dueDate);
+  while (d < t) {
+    if      (task.recurrence === "daily")    d.setDate(d.getDate()+1);
+    else if (task.recurrence === "weekly")   d.setDate(d.getDate()+7);
+    else if (task.recurrence === "biweekly") d.setDate(d.getDate()+14);
+    else if (task.recurrence === "monthly")  d.setMonth(d.getMonth()+1);
+  }
+  return d.toISOString().slice(0,10);
+}
+
+function isOverdue(t)  { return nextDue(t) < today(); }
+function isDueToday(t) { return nextDue(t) === today(); }
+function isCompleted(id) { return !!completions[id+"|"+today()]; }
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const [y,m,d] = iso.split("-");
+  return `${m}/${d}/${y}`;
+}
+
+function recurrenceLabel(r) {
+  return {daily:"Daily",weekly:"Weekly",biweekly:"Bi-Weekly",monthly:"Monthly",none:""}[r]||"";
+}
+
+function sortTasks(arr) {
+  return [...arr].sort((a,b) => {
+    const da=nextDue(a), db=nextDue(b);
+    if(da<db) return -1; if(da>db) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function uuid() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+}
+
+// ── Sync Status ────────────────────────────────────────────────
+function setSyncStatus(s, msg) {
+  syncStatus = s;
+  const dot   = document.getElementById("sync-dot");
+  const label = document.getElementById("sync-label");
+  dot.className   = "sync-dot" + (s==="syncing" ? " syncing" : s==="error" ? " error" : "");
+  label.textContent = msg || (s==="syncing"?"Saving…":s==="error"?"Sync error":"Synced");
+}
+
+// ── API Calls ──────────────────────────────────────────────────
+const NO_API = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
+
+async function apiGet() {
+  if (NO_API) return null;
+  try {
+    const r = await fetch(API_URL + "?t=" + Date.now());
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function apiPost(body) {
+  if (NO_API) return null;
+  try {
+    setSyncStatus("syncing");
+    const r = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (j.ok) setSyncStatus("idle");
+    else      setSyncStatus("error", "Sync error");
+    return j;
+  } catch(e) {
+    setSyncStatus("error", "Offline");
+    return null;
+  }
+}
+
+// ── Local Storage fallback ─────────────────────────────────────
+function localSave() {
+  localStorage.setItem("tf-tasks",        JSON.stringify(tasks));
+  localStorage.setItem("tf-appointments", JSON.stringify(appointments));
+  localStorage.setItem("tf-completions",  JSON.stringify(completions));
+}
+function localLoad() {
+  tasks        = JSON.parse(localStorage.getItem("tf-tasks")        || "[]");
+  appointments = JSON.parse(localStorage.getItem("tf-appointments") || "{}");
+  completions  = JSON.parse(localStorage.getItem("tf-completions")  || "{}");
+}
+
+// ── Load data ──────────────────────────────────────────────────
+async function loadData() {
+  localLoad(); // show local data immediately
+  renderAll();
+  setSyncStatus("syncing", "Loading…");
+
+  const data = await apiGet();
+  if (!data) {
+    setSyncStatus(NO_API ? "idle" : "error", NO_API ? "Local mode" : "Offline — using local data");
+    return;
+  }
+
+  // Merge server tasks
+  tasks = (data.tasks || []).map(t => ({
+    ...t,
+    completedDates: t.completedDates || [],
+  }));
+
+  // Rebuild completions from server completedDates + local completions (today)
+  const merged = { ...completions };
+  tasks.forEach(t => {
+    (t.completedDates || []).forEach(d => { merged[t.id+"|"+d] = true; });
+  });
+  completions = merged;
+
+  appointments = data.appts || {};
+  localSave();
+  setSyncStatus("idle", "Synced");
+  renderAll();
+}
+
+// ── Persist task to server ─────────────────────────────────────
+async function persistTask(task) {
+  // Attach completedDates array
+  const completedDates = Object.keys(completions)
+    .filter(k => k.startsWith(task.id+"|"))
+    .map(k => k.split("|")[1]);
+  await apiPost({ action:"saveTask", task: { ...task, completedDates } });
+  localSave();
+}
+
+async function persistDeleteTask(id) {
+  await apiPost({ action:"deleteTask", id });
+  localSave();
+}
+
+async function persistAppts(date, apptArr) {
+  await apiPost({ action:"saveAppts", date, appts: apptArr });
+  localSave();
+}
+
+// ── Task CRUD ──────────────────────────────────────────────────
+async function saveTask() {
+  const name = document.getElementById("f-name").value.trim();
+  if (!name) { document.getElementById("f-name").focus(); return; }
+
+  const task = {
+    id:         editingId || uuid(),
+    name,
+    entity:     document.getElementById("f-entity").value.trim(),
+    startDate:  document.getElementById("f-start").value,
+    dueDate:    document.getElementById("f-due").value,
+    recurrence: document.getElementById("f-recurrence").value,
+  };
+
+  const idx = tasks.findIndex(t => t.id === task.id);
+  if (idx >= 0) tasks[idx] = task; else tasks.push(task);
+
+  closeModal();
+  renderAll();
+  await persistTask(task);
+}
+
+async function deleteTask(id) {
+  if (!confirm("Delete this task?")) return;
+  tasks = tasks.filter(t => t.id !== id);
+  Object.keys(completions).forEach(k => { if(k.startsWith(id+"|")) delete completions[k]; });
+  renderAll();
+  await persistDeleteTask(id);
+}
+
+async function toggleComplete(id) {
+  const key = id+"|"+today();
+  if (completions[key]) delete completions[key]; else completions[key] = true;
+  // Update completedDates on task
+  const task = tasks.find(t => t.id === id);
+  if (task) {
+    task.completedDates = Object.keys(completions)
+      .filter(k => k.startsWith(id+"|"))
+      .map(k => k.split("|")[1]);
+  }
+  localSave();
+  renderAll();
+  if (task) await persistTask(task);
+}
+
+// ── Appointments CRUD ──────────────────────────────────────────
+async function addAppt(date, text) {
+  if (!text.trim()) return;
+  if (!appointments[date]) appointments[date] = [];
+  appointments[date].push(text.trim());
+  renderWeek();
+  await persistAppts(date, appointments[date]);
+  localSave();
+}
+
+async function removeAppt(date, idx) {
+  if (!appointments[date]) return;
+  appointments[date].splice(idx, 1);
+  renderWeek();
+  await persistAppts(date, appointments[date]);
+  localSave();
+}
+
+// ── Modal ──────────────────────────────────────────────────────
+function openModal(task) {
+  editingId = task ? task.id : null;
+  document.getElementById("modal-title").textContent = task ? "Edit Task" : "New Task";
+  document.getElementById("f-name").value       = task ? task.name : "";
+  document.getElementById("f-entity").value     = task ? task.entity : "";
+  document.getElementById("f-start").value      = task ? task.startDate : today();
+  document.getElementById("f-due").value        = task ? task.dueDate : today();
+  document.getElementById("f-recurrence").value = task ? task.recurrence : "none";
+  document.getElementById("modal-overlay").style.display = "flex";
+  setTimeout(() => document.getElementById("f-name").focus(), 50);
+}
+function closeModal() {
+  document.getElementById("modal-overlay").style.display = "none";
+  editingId = null;
+}
+document.addEventListener("keydown", e => { if(e.key==="Escape") closeModal(); });
+
+// ── Filter ─────────────────────────────────────────────────────
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.filter === f);
+  });
+  renderTasks();
+}
+
+// ── SVG Icons ─────────────────────────────────────────────────
+function icon(path, size=14, color="currentColor", sw=1.8) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>`;
+}
+const ICON_CHECK = "M20 6L9 17l-5-5";
+const ICON_EDIT  = "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z";
+const ICON_TRASH = "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6";
+const ICON_PLUS  = "M12 5v14M5 12h14";
+const ICON_CLOSE = "M18 6L6 18M6 6l12 12";
+
+// ── Render Week ────────────────────────────────────────────────
+function renderWeek() {
+  const weekDays = getWeekDays();
+  const t = today();
+
+  // Month label
+  const first = new Date(weekDays[0]+"T12:00:00");
+  const last  = new Date(weekDays[6]+"T12:00:00");
+  const opts  = { month:"long", year:"numeric" };
+  const optSh = { month:"short" };
+  document.getElementById("month-label").textContent =
+    first.getMonth() === last.getMonth()
+      ? first.toLocaleDateString("en-US", opts)
+      : first.toLocaleDateString("en-US", optSh) + " – " + last.toLocaleDateString("en-US", {month:"short", year:"numeric"});
+
+  const dayNames = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  const grid = document.getElementById("week-grid");
+  grid.innerHTML = weekDays.map((date, i) => {
+    const isToday = date === t;
+    const isPast  = date < t;
+    const appts   = appointments[date] || [];
+    const dayNum  = new Date(date+"T12:00:00").getDate();
+    const cls     = ["day-col", isToday?"today":"", isPast?"past":""].filter(Boolean).join(" ");
+
+    const apptItems = appts.map((a,ai) => `
+      <div class="appt-item">
+        <div class="appt-dot"></div>
+        <span class="appt-text">${escHtml(a)}</span>
+        <button class="appt-del" onclick="removeAppt('${date}',${ai})">${icon(ICON_CLOSE,8,"#7A9090")}</button>
+      </div>`).join("");
+
+    return `
+      <div class="${cls}">
+        <div class="day-header">
+          <div class="day-label">${dayNames[i]}</div>
+          <div class="day-num">${dayNum}</div>
+        </div>
+        <div class="appt-list">
+          ${appts.length === 0 ? '<div class="appt-empty">—</div>' : apptItems}
+        </div>
+        <div class="appt-input-row">
+          <input class="appt-input" id="appt-input-${date}" placeholder="+" 
+            onkeydown="if(event.key==='Enter'){addAppt('${date}',this.value);this.value='';}" />
+          <button class="appt-add-btn" style="display:none" id="appt-btn-${date}"
+            onclick="addAppt('${date}',document.getElementById('appt-input-${date}').value);document.getElementById('appt-input-${date}').value='';this.style.display='none'">
+            ${icon(ICON_PLUS,9,"#fff",2.5)}
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+
+  // Show/hide add button as user types
+  weekDays.forEach(date => {
+    const inp = document.getElementById("appt-input-"+date);
+    const btn = document.getElementById("appt-btn-"+date);
+    if (inp && btn) {
+      inp.addEventListener("input", () => {
+        btn.style.display = inp.value.trim() ? "flex" : "none";
+      });
+    }
+  });
+}
+
+// ── Render Task Table ──────────────────────────────────────────
+function renderSection(title, taskList, accentColor) {
+  if (!taskList.length) return "";
+  const t = today();
+
+  const rows = taskList.map((task,i) => {
+    const done      = isCompleted(task.id);
+    const due       = nextDue(task);
+    const overdue   = !done && isOverdue(task);
+    const dueToday  = !done && isDueToday(task);
+    const rowCls    = done?"done-row":overdue?"overdue-row":dueToday?"today-row":"";
+
+    const dueChipCls = overdue?"overdue":dueToday?"today":"";
+    const dueDisplay = overdue&&!done ? fmtDate(due)+" ▲" : fmtDate(due);
+
+    const cbStyle = `width:18px;height:18px;border-radius:4px;border:2px solid ${done?"#2D6A6A":overdue?"#C0392B":dueToday?"#1A5276":"#D1E0E0"};background:${done?"#2D6A6A":"transparent"};`;
+
+    const badge = (task.recurrence !== "none" && !done)
+      ? `<span class="recurrence-badge">${recurrenceLabel(task.recurrence)}</span>` : "";
+
+    const taskJSON = escAttr(JSON.stringify(task));
+
+    return `<tr class="${rowCls}">
+      <td class="td-check">
+        <button class="checkbox" style="${cbStyle}" onclick="toggleComplete('${task.id}')">
+          ${done ? icon(ICON_CHECK,10,"#fff",3) : ""}
+        </button>
+      </td>
+      <td class="td-name">${escHtml(task.name)}${badge}</td>
+      <td class="td-entity">${escHtml(task.entity||"")}</td>
+      <td class="td-start">${fmtDate(task.startDate)}</td>
+      <td class="td-due"><span class="due-chip ${dueChipCls}">${dueDisplay}</span></td>
+      <td class="td-actions">
+        <div class="action-btns">
+          <button class="action-btn" onclick='openModal(${taskJSON})' title="Edit">${icon(ICON_EDIT,12,"#7A9090")}</button>
+          <button class="action-btn" onclick="deleteTask('${task.id}')" title="Delete">${icon(ICON_TRASH,12,"#C0392B")}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <div class="section">
+      <div style="background:${accentColor}">
+        <div class="section-col-heads">
+          <div class="col-head"></div>
+          <div class="col-head">Task</div>
+          <div class="col-head hide-sm">Entity</div>
+          <div class="col-head hide-sm">Start</div>
+          <div class="col-head">Due</div>
+          <div class="col-head"></div>
+        </div>
+        <div class="section-title-row">
+          <span class="section-title">${title}</span>
+        </div>
+      </div>
+      <table><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+function renderTasks() {
+  const t   = today();
+  const sorted = sortTasks(tasks);
+
+  const filtered = sorted.filter(task => {
+    if (currentFilter === "due")
+      return (nextDue(task) <= t || task.startDate <= t) || isCompleted(task.id);
+    return true;
+  });
+
+  const overdueList   = filtered.filter(t => isOverdue(t) && !isCompleted(t.id));
+  const activeList    = filtered.filter(t => !isOverdue(t) && !isCompleted(t.id) &&
+    (isDueToday(t) || (t.startDate <= today() && nextDue(t) > today())));
+  const upcomingList  = currentFilter === "all"
+    ? sorted.filter(t => nextDue(t) > today() && t.startDate > today() && !isCompleted(t.id))
+    : [];
+  const completedList = filtered.filter(t => isCompleted(t.id));
+
+  const area = document.getElementById("task-area");
+
+  if (!overdueList.length && !activeList.length && !upcomingList.length && !completedList.length) {
+    area.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✦</div>
+        <div style="font-weight:700;font-size:.9rem;color:#4A6060">No tasks to show</div>
+        <div style="font-size:.8rem;margin-top:.2rem">Click "New Task" to get started</div>
+      </div>`;
+    return;
+  }
+
+  let html = "";
+  if (NO_API) {
+    html += `<div class="setup-banner">
+      ${icon("M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z",18,"#D97706",2)}
+      <div>
+        <strong style="font-size:.85rem;color:#92400E">Google Sheets not connected</strong>
+        <div style="font-size:.78rem;color:#B45309;margin-top:.2rem">
+          Data is saved locally on this device only. To sync across devices, paste your Apps Script URL into the <code>API_URL</code> variable at the top of this file.
+        </div>
+      </div>
+    </div>`;
+  }
+
+  html += renderSection("OVERDUE TASKS",   overdueList,  "#A93226");
+  html += renderSection(currentFilter==="due"?"ACTIVE TASKS":"TODAY'S TASKS", activeList, "#1A5276");
+  html += renderSection("UPCOMING TASKS",  upcomingList, "#2D6A6A");
+  html += renderSection("COMPLETED TODAY", completedList,"#5D6D6D");
+
+  area.innerHTML = html;
+}
+
+function renderAll() {
+  renderWeek();
+  renderTasks();
+}
+
+// ── Today string ───────────────────────────────────────────────
+document.getElementById("today-str").textContent =
+  new Date().toLocaleDateString("en-US", {weekday:"long",month:"long",day:"numeric",year:"numeric"});
+
+// ── HTML escape helpers ────────────────────────────────────────
+function escHtml(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function escAttr(s) {
+  return String(s||"").replace(/'/g,"&#39;").replace(/"/g,"&quot;");
+}
+
+// ── Boot ───────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
