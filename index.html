@@ -162,8 +162,8 @@ tbody tr.row-done{opacity:.5}
 .subtask-row:hover td{background:var(--color-accent-bg)}
 .subtask-row.row-done td{opacity:.5}
 .subtask-row.row-done .td-name{text-decoration:line-through;color:var(--color-text-tertiary)}
-.subtask-chk{width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;cursor:pointer;border:1.5px solid var(--color-border-strong);background:transparent;font-size:10px;color:#fff;padding:0}
-.subtask-chk:hover{border-color:var(--color-accent-mid);background:var(--color-accent-bg)}
+.subtask-chk{width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;border:1.5px solid var(--color-border-strong);background:transparent;font-size:10px;color:#fff;padding:0;vertical-align:middle}
+.subtask-row:hover .subtask-chk{border-color:var(--color-accent-mid)}
 .subtask-chk.checked{background:var(--color-accent-mid);border-color:var(--color-accent-mid)}
 .progress-badge{display:inline-block;margin-left:.4rem;font-size:.58rem;font-weight:500;color:var(--color-accent-text);background:var(--color-accent-bg);padding:.08rem .3rem;border-radius:4px;border:0.5px solid rgba(186,117,23,.2);vertical-align:middle}
 .progress-badge.complete{background:var(--color-success-bg);color:#085041;border-color:rgba(29,158,117,.2)}
@@ -472,7 +472,13 @@ function loadData() {
     var merged={};
     tasks.forEach(function(t){ (t.completedDates||[]).forEach(function(d){ merged[t.id+"|"+d]=true; }); });
     Object.keys(completions).forEach(function(k){ if(k.slice(-10)===todayStr()) merged[k]=true; });
-    completions=merged; appointments=data.appts||{};
+    completions=merged; // Normalize appointment date keys from sheet
+var rawAppts = data.appts || {};
+var normAppts = {};
+Object.keys(rawAppts).forEach(function(k) {
+  normAppts[normalizeDate(k)] = rawAppts[k];
+});
+appointments = normAppts;
     localSave(); setSync("idle"); renderAll();
   });
 }
@@ -709,8 +715,8 @@ function renderTasks() {
     }
     // Expand/collapse toggle shown only if task has subtasks
     var expandBtn = hasSubtasks
-      ? '<button class="expand-btn" data-id="'+task.id+'" title="'+(isExpanded?"Hide":"Show")+' subtasks" style="background:none;border:none;cursor:pointer;padding:0 0 0 .3rem;color:var(--color-text-tertiary);font-size:12px;vertical-align:middle">'
-        +'<i class="ti ti-chevron-'+(isExpanded?"up":"down")+'" aria-hidden="true"></i></button>'
+      ? '<button class="expand-btn" data-id="'+task.id+'" title="'+(isExpanded?"Hide":"Show")+' subtasks" style="background:none;border:none;cursor:pointer;padding:0 0 0 .3rem;color:var(--color-text-tertiary);font-size:12px;vertical-align:middle;line-height:1">'
+        +'<i class="ti ti-chevron-'+(isExpanded?"up":"down")+'" aria-hidden="true" style="pointer-events:none;font-size:12px"></i></button>'
       : "";
     // Parent is only truly done if all subtasks are also done
     var effectiveDone = done2 && allSubtasksDone(task);
@@ -732,13 +738,13 @@ function renderTasks() {
         var stDone = isSubtaskDone(st);
         var stCls = "subtask-row" + (stDone?" row-done":"");
         var stChkCls = stDone?"subtask-chk checked":"subtask-chk";
-        rows += '<tr class="'+stCls+'">'
+        rows += '<tr class="'+stCls+'" onclick="toggleSubtask(''+task.id+'',''+st.id+'')" style="cursor:pointer">'
           +'<td class="td-chk">'
-          +'<button class="'+stChkCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'" style="pointer-events:all">'
-          +(stDone?'<i class="ti ti-check" style="pointer-events:none" aria-hidden="true"></i>':'<span style="pointer-events:none;display:block;width:8px;height:8px;border-radius:2px;border:1.5px solid var(--color-border-strong)"></span>')
-          +'</button>'
+          +'<span class="'+stChkCls+'" style="pointer-events:none">'
+          +(stDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')
+          +'</span>'
           +'</td>'
-          +'<td class="td-name" colspan="4" style="color:var(--color-text-secondary);font-weight:400;padding-left:2rem">'
+          +'<td class="td-name" colspan="4" style="color:var(--color-text-secondary);font-weight:400;padding-left:1.75rem">'
           +'<i class="ti ti-corner-down-right" style="font-size:11px;margin-right:.35rem;color:var(--color-text-tertiary);pointer-events:none" aria-hidden="true"></i>'
           +eh(st.name)
           +'</td>'
@@ -767,9 +773,7 @@ document.getElementById("task-area").addEventListener("click",function(e){
   // Expand/collapse toggle
   var expBtn=e.target.closest(".expand-btn");
   if(expBtn){ toggleExpand(expBtn.getAttribute("data-id")); return; }
-  // Subtask checkbox
-  var stChk=e.target.closest(".subtask-chk");
-  if(stChk){ toggleSubtask(stChk.getAttribute("data-taskid"), stChk.getAttribute("data-stid")); return; }
+  // Subtask checkboxes use inline onclick on TR - no delegation needed here
   // Parent checkbox
   var chk=e.target.closest(".chkbox"); if(chk){toggleComplete(chk.getAttribute("data-id"));return;}
   var edit=e.target.closest(".edit-btn"); if(edit){var id=edit.getAttribute("data-id"); var task=tasks.find(function(t){return t.id===id;}); if(task) openModal(task); return;}
