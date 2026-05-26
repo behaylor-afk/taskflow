@@ -162,7 +162,8 @@ tbody tr.row-done{opacity:.5}
 .subtask-row:hover td{background:var(--color-accent-bg)}
 .subtask-row.row-done td{opacity:.5}
 .subtask-row.row-done .td-name{text-decoration:line-through;color:var(--color-text-tertiary)}
-.subtask-chk{width:14px;height:14px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;cursor:pointer;border:1.5px solid var(--color-border-strong);background:transparent;font-size:9px;color:#fff}
+.subtask-chk{width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;cursor:pointer;border:1.5px solid var(--color-border-strong);background:transparent;font-size:10px;color:#fff;padding:0}
+.subtask-chk:hover{border-color:var(--color-accent-mid);background:var(--color-accent-bg)}
 .subtask-chk.checked{background:var(--color-accent-mid);border-color:var(--color-accent-mid)}
 .progress-badge{display:inline-block;margin-left:.4rem;font-size:.58rem;font-weight:500;color:var(--color-accent-text);background:var(--color-accent-bg);padding:.08rem .3rem;border-radius:4px;border:0.5px solid rgba(186,117,23,.2);vertical-align:middle}
 .progress-badge.complete{background:var(--color-success-bg);color:#085041;border-color:rgba(29,158,117,.2)}
@@ -290,7 +291,7 @@ tbody tr.row-done{opacity:.5}
 </div>
 
 <script>
-var API_URL = "https://script.google.com/macros/s/AKfycbyXmNkZFy91xe5gN8hUiRySPMkBcqVJGu1q9ibEb4ewbfZVsufcl1TmJeT2C5tPoe1T/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbwRnaZaLn3udG8_RpwZUpwyPrGZ_4CDaWg4pvOIOZk6u8T5hqh7hpq1iad2_e79dpcE/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -386,32 +387,46 @@ function setSync(state, msg) {
   lbl.textContent=msg||(state==="syncing"?"Saving...":state==="error"?"Sync error":"Synced");
 }
 
-// READ — Apps Script follows redirect and returns CORS headers on final response
+// READ via JSONP — completely bypasses CORS, works on all devices/browsers
 function apiGet() {
   if (NO_API) return Promise.resolve(null);
-  return fetch(API_URL + "?t=" + Date.now())
-    .then(function(r) { return r.json(); })
-    .catch(function(err) { console.warn("apiGet error:", err); return null; });
+  return new Promise(function(resolve) {
+    var cb    = "tfcb_" + Date.now();
+    var script = document.createElement("script");
+    var done  = false;
+    var timer = setTimeout(function() {
+      if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); resolve(null); }
+    }, 15000);
+    window[cb] = function(data) {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); resolve(data); }
+    };
+    script.onerror = function() {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; resolve(null); }
+    };
+    script.src = API_URL + "?callback=" + cb + "&t=" + Date.now();
+    document.head.appendChild(script);
+  });
 }
 
-// WRITE — send as POST with text/plain content-type (no preflight triggered)
+// WRITE via JSONP GET — same bypass, carries payload as query param
 function apiPost(body) {
   if (NO_API) return Promise.resolve(null);
   setSync("syncing");
-  return fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(body)
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(j) { setSync(j && j.ok ? "idle" : "error"); return j; })
-  .catch(function(err) {
-    console.warn("apiPost error:", err);
-    // Fallback: tunnel write through GET
-    return fetch(API_URL + "?payload=" + encodeURIComponent(JSON.stringify(body)) + "&t=" + Date.now())
-      .then(function(r) { return r.json(); })
-      .then(function(j) { setSync(j && j.ok ? "idle" : "error"); return j; })
-      .catch(function() { setSync("error", "Offline"); return null; });
+  return new Promise(function(resolve) {
+    var cb    = "tfwcb_" + Date.now();
+    var script = document.createElement("script");
+    var done  = false;
+    var timer = setTimeout(function() {
+      if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("error","Offline"); resolve(null); }
+    }, 15000);
+    window[cb] = function(data) {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
+    };
+    script.onerror = function() {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
+    };
+    script.src = API_URL + "?callback=" + cb + "&payload=" + encodeURIComponent(JSON.stringify(body)) + "&t=" + Date.now();
+    document.head.appendChild(script);
   });
 }
 
@@ -718,12 +733,15 @@ function renderTasks() {
         var stCls = "subtask-row" + (stDone?" row-done":"");
         var stChkCls = stDone?"subtask-chk checked":"subtask-chk";
         rows += '<tr class="'+stCls+'">'
-          +'<td class="td-chk"><button class="'+stChkCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'">'+(stDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')+'</button></td>'
-          +'<td class="td-name" colspan="3" style="color:var(--color-text-secondary);font-weight:400">'
-          +'<i class="ti ti-corner-down-right" style="font-size:11px;margin-right:.3rem;color:var(--color-text-tertiary)" aria-hidden="true"></i>'
-          +eh(st.name)+'</td>'
-          +'<td class="td-due"></td>'
-          +'<td class="td-act"></td>'
+          +'<td class="td-chk">'
+          +'<button class="'+stChkCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'" style="pointer-events:all">'
+          +(stDone?'<i class="ti ti-check" style="pointer-events:none" aria-hidden="true"></i>':'<span style="pointer-events:none;display:block;width:8px;height:8px;border-radius:2px;border:1.5px solid var(--color-border-strong)"></span>')
+          +'</button>'
+          +'</td>'
+          +'<td class="td-name" colspan="4" style="color:var(--color-text-secondary);font-weight:400;padding-left:2rem">'
+          +'<i class="ti ti-corner-down-right" style="font-size:11px;margin-right:.35rem;color:var(--color-text-tertiary);pointer-events:none" aria-hidden="true"></i>'
+          +eh(st.name)
+          +'</td>'
           +'</tr>';
       }
     }
