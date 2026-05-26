@@ -738,7 +738,7 @@ function renderTasks() {
         var stDone = isSubtaskDone(st);
         var stCls = "subtask-row" + (stDone?" row-done":"");
         var stChkCls = stDone?"subtask-chk checked":"subtask-chk";
-        rows += '<tr class="'+stCls+'" onclick="toggleSubtask(''+task.id+'',''+st.id+'')" style="cursor:pointer">'
+        rows += '<tr class="'+stCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'" class="subtask-tr" style="cursor:pointer">'
           +'<td class="td-chk">'
           +'<span class="'+stChkCls+'" style="pointer-events:none">'
           +(stDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')
@@ -773,7 +773,12 @@ document.getElementById("task-area").addEventListener("click",function(e){
   // Expand/collapse toggle
   var expBtn=e.target.closest(".expand-btn");
   if(expBtn){ toggleExpand(expBtn.getAttribute("data-id")); return; }
-  // Subtask checkboxes use inline onclick on TR - no delegation needed here
+  // Subtask row click
+  var stRow = e.target.closest("[data-stid]");
+  if (stRow) {
+    toggleSubtask(stRow.getAttribute("data-taskid"), stRow.getAttribute("data-stid"));
+    return;
+  }
   // Parent checkbox
   var chk=e.target.closest(".chkbox"); if(chk){toggleComplete(chk.getAttribute("data-id"));return;}
   var edit=e.target.closest(".edit-btn"); if(edit){var id=edit.getAttribute("data-id"); var task=tasks.find(function(t){return t.id===id;}); if(task) openModal(task); return;}
