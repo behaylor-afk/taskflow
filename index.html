@@ -61,6 +61,7 @@
 html,body{width:100%;min-height:100vh;font-family:var(--font);background:var(--color-bg);color:var(--color-text-primary);-webkit-tap-highlight-color:transparent}
 input,select,button,textarea{font-family:inherit}
 button{cursor:pointer;border:none;background:none}
+button i{pointer-events:none}
 input::placeholder{color:var(--color-text-tertiary)}
 input[type=date]::-webkit-calendar-picker-indicator{opacity:.4;cursor:pointer;filter:invert(0)}
 select option{background:var(--color-surface)}
@@ -299,27 +300,50 @@ var curFilter    = "due";
 var expandedTasks = {}; // taskId -> true/false
 var editingId    = null;
 
-function todayStr() { return new Date().toISOString().slice(0,10); }
+function todayStr() {
+  var d = new Date();
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,"0");
+  var day = String(d.getDate()).padStart(2,"0");
+  return y+"-"+m+"-"+day;
+}
+
+function localDateStr(d) {
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,"0");
+  var day = String(d.getDate()).padStart(2,"0");
+  return y+"-"+m+"-"+day;
+}
 
 function getWeekDays() {
-  var now=new Date(), day=now.getDay(), diff=(day===0)?-6:1-day;
-  var mon=new Date(now); mon.setDate(now.getDate()+diff);
-  return Array.from({length:7},function(_,i){ var d=new Date(mon); d.setDate(mon.getDate()+i); return d.toISOString().slice(0,10); });
+  var now = new Date();
+  var day = now.getDay();
+  var diff = (day === 0) ? -6 : 1 - day;
+  var mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+  var days = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+    days.push(localDateStr(d));
+  }
+  return days;
 }
 
 function addBizDays(dateStr, n) {
-  var d=new Date(dateStr+"T12:00:00"), added=0;
+  var p=dateStr.split("-");
+  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  var added=0;
   while(added<n){ d.setDate(d.getDate()+1); var dow=d.getDay(); if(dow!==0&&dow!==6) added++; }
-  return d.toISOString().slice(0,10);
+  return localDateStr(d);
 }
 
 function nextOccurrence(task, fromDate) {
-  if(task.recurrence==="daily")    return addBizDays(fromDate,1);
-  var x=new Date(fromDate+"T12:00:00");
-  if(task.recurrence==="weekly")   { x.setDate(x.getDate()+7); }
-  else if(task.recurrence==="biweekly") { x.setDate(x.getDate()+14); }
-  else if(task.recurrence==="monthly")  { x.setMonth(x.getMonth()+1); }
-  return x.toISOString().slice(0,10);
+  if(task.recurrence==="daily") return addBizDays(fromDate,1);
+  var p=fromDate.split("-");
+  var x=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  if(task.recurrence==="weekly")        x.setDate(x.getDate()+7);
+  else if(task.recurrence==="biweekly") x.setDate(x.getDate()+14);
+  else if(task.recurrence==="monthly")  x.setMonth(x.getMonth()+1);
+  return localDateStr(x);
 }
 
 function isOverdue(task)   { return task.dueDate < todayStr(); }
@@ -331,7 +355,7 @@ function normalizeDate(val) {
   var s=String(val).trim();
   if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){ var p=s.split("/"); return p[2]+"-"+p[0].padStart(2,"0")+"-"+p[1].padStart(2,"0"); }
-  try{ var d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,10); } catch(e){}
+  try{ var d=new Date(s); if(!isNaN(d)) return localDateStr(d); } catch(e){}
   return s;
 }
 
@@ -395,7 +419,20 @@ function localSave() {
   try{ localStorage.setItem("tf-tasks",JSON.stringify(tasks)); localStorage.setItem("tf-appts",JSON.stringify(appointments)); localStorage.setItem("tf-comps",JSON.stringify(completions)); }catch(e){}
 }
 function localLoad() {
-  try{ tasks=JSON.parse(localStorage.getItem("tf-tasks")||"[]"); appointments=JSON.parse(localStorage.getItem("tf-appts")||"{}"); completions=JSON.parse(localStorage.getItem("tf-comps")||"{}"); }catch(e){}
+  try{
+    tasks=JSON.parse(localStorage.getItem("tf-tasks")||"[]");
+    appointments=JSON.parse(localStorage.getItem("tf-appts")||"{}");
+    completions=JSON.parse(localStorage.getItem("tf-comps")||"{}");
+    // Ensure subtask completedDates arrays exist
+    tasks = tasks.map(function(t) {
+      if (!t.subtasks) t.subtasks = [];
+      t.subtasks = t.subtasks.map(function(st) {
+        if (!st.completedDates) st.completedDates = [];
+        return st;
+      });
+      return t;
+    });
+  }catch(e){}
 }
 
 function loadData() {
@@ -410,6 +447,11 @@ function loadData() {
       try { t.subtasks = JSON.parse(t.subtasks); } catch(e) { t.subtasks = []; }
     }
     if (!t.subtasks) t.subtasks = [];
+    // Ensure every subtask has a completedDates array
+    t.subtasks = t.subtasks.map(function(st) {
+      if (!st.completedDates) st.completedDates = [];
+      return st;
+    });
     return t;
   });
     var merged={};
@@ -571,7 +613,9 @@ function eh(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").
 
 function renderWeek() {
   var days=getWeekDays(), t=todayStr(), dayNames=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-  var first=new Date(days[0]+"T12:00:00"), last=new Date(days[6]+"T12:00:00");
+  var fp=days[0].split("-"), lp=days[6].split("-");
+  var first=new Date(parseInt(fp[0]),parseInt(fp[1])-1,parseInt(fp[2]));
+  var last=new Date(parseInt(lp[0]),parseInt(lp[1])-1,parseInt(lp[2]));
   var ml=(first.getMonth()===last.getMonth())
     ?first.toLocaleDateString("en-US",{month:"long",year:"numeric"})
     :first.toLocaleDateString("en-US",{month:"short"})+" – "+last.toLocaleDateString("en-US",{month:"short",year:"numeric"});
@@ -657,7 +701,7 @@ function renderTasks() {
     var effectiveDone = done2 && allSubtasksDone(task);
     var chkClass = effectiveDone ? "chkbox checked" : "chkbox";
     rows+='<tr class="'+rowCls+'">'
-      +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<i class="ti ti-check" aria-hidden="true"></i>':'')+'</button></td>'
+      +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')+'</button></td>'
       +'<td class="td-name">'+eh(task.name)+recBadge+progBadge+expandBtn+'</td>'
       +'<td class="td-ent">'+eh(task.entity||"")+'</td>'
       +'<td class="td-start">'+fmtDate(task.startDate)+'</td>'
@@ -674,7 +718,7 @@ function renderTasks() {
         var stCls = "subtask-row" + (stDone?" row-done":"");
         var stChkCls = stDone?"subtask-chk checked":"subtask-chk";
         rows += '<tr class="'+stCls+'">'
-          +'<td class="td-chk"><button class="'+stChkCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'">'+(stDone?'<i class="ti ti-check" aria-hidden="true"></i>':'')+'</button></td>'
+          +'<td class="td-chk"><button class="'+stChkCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'">'+(stDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')+'</button></td>'
           +'<td class="td-name" colspan="3" style="color:var(--color-text-secondary);font-weight:400">'
           +'<i class="ti ti-corner-down-right" style="font-size:11px;margin-right:.3rem;color:var(--color-text-tertiary)" aria-hidden="true"></i>'
           +eh(st.name)+'</td>'
