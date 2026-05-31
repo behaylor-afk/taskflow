@@ -179,27 +179,6 @@ tbody tr.row-done{opacity:.5}
 .subtask-add-inp:focus{border-color:var(--color-accent-mid)}
 .subtask-add-btn{background:var(--color-accent-mid);color:#fff;border:none;border-radius:var(--radius-sm);padding:.35rem .65rem;font-size:.75rem;cursor:pointer;white-space:nowrap}
 
-/* ── Habit Tracker ── */
-#habit-section{background:var(--color-surface);border-bottom:0.5px solid var(--color-border);padding:.875rem 1.25rem}
-#habit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
-.habit-section-title{font-size:.72rem;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em}
-.habit-add-row{display:flex;gap:.5rem;margin-bottom:.625rem}
-.habit-add-inp{flex:1;background:var(--color-surface-2);border:0.5px solid var(--color-border-strong);border-radius:var(--radius-md);color:var(--color-text-primary);padding:.35rem .65rem;font-size:.78rem;outline:none}
-.habit-add-inp:focus{border-color:var(--color-accent-mid)}
-.habit-add-btn{background:var(--color-accent-mid);color:#fff;border:none;border-radius:var(--radius-md);padding:.35rem .75rem;font-size:.75rem;font-weight:500;cursor:pointer;white-space:nowrap}
-.habit-table{width:100%;border-collapse:collapse}
-.habit-table th{padding:.3rem .4rem;font-size:.62rem;font-weight:600;color:var(--color-text-tertiary);text-align:center;width:36px}
-.habit-table th.habit-name-col{text-align:left;width:auto;padding-left:0}
-.habit-table td{padding:.3rem .4rem;border-top:0.5px solid var(--color-border);vertical-align:middle;text-align:center}
-.habit-table td.habit-name-cell{text-align:left;font-size:.8rem;color:var(--color-text-primary);padding-left:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
-.habit-check{width:24px;height:24px;border-radius:var(--radius-sm);border:0.5px solid var(--color-border-strong);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:all .15s}
-.habit-check:hover{border-color:var(--color-accent-mid);background:var(--color-accent-bg)}
-.habit-check.done{background:var(--color-accent-mid);border-color:var(--color-accent-mid)}
-.habit-check.today-col{border-color:var(--color-accent-mid)}
-.habit-del{background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:13px;padding:0 0 0 .4rem;opacity:.4;vertical-align:middle}
-.habit-del:hover{opacity:1;color:var(--color-danger)}
-.habit-today-hd{color:var(--color-accent)!important;font-weight:700!important}
-
 /* ── Modal ── */
 .modal-bg{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:1rem;animation:fadeIn .15s ease}
 .modal-box{background:var(--color-surface);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:460px;border:0.5px solid var(--color-border-strong);animation:fadeUp .2s ease}
@@ -236,17 +215,6 @@ tbody tr.row-done{opacity:.5}
     </div>
   </div>
   <div id="week-grid"></div>
-</div>
-
-<div id="habit-section">
-  <div id="habit-header">
-    <span class="habit-section-title">Habit Tracker</span>
-  </div>
-  <div class="habit-add-row">
-    <input class="habit-add-inp" id="habit-add-inp" placeholder="Add a habit..."/>
-    <button class="habit-add-btn" id="habit-add-btn">Add Habit</button>
-  </div>
-  <div id="habit-table-wrap"></div>
 </div>
 
 <div id="controls">
@@ -331,7 +299,6 @@ var appointments = {};
 var completions  = {};
 var curFilter    = "due";
 var expandedTasks = {}; // taskId -> true/false
-var habits = []; // [{id, name, completions: {"YYYY-MM-DD": true}}]
 var editingId    = null;
 
 function todayStr() {
@@ -476,7 +443,6 @@ function localLoad() {
     tasks=JSON.parse(localStorage.getItem("tf-tasks")||"[]");
     appointments=JSON.parse(localStorage.getItem("tf-appts")||"{}");
     completions=JSON.parse(localStorage.getItem("tf-comps")||"{}");
-    habits=JSON.parse(localStorage.getItem("tf-habits")||"[]");
     // Ensure subtask completedDates arrays exist
     tasks = tasks.map(function(t) {
       if (!t.subtasks) t.subtasks = [];
@@ -526,10 +492,6 @@ Object.keys(rawAppts).forEach(function(k) {
   normAppts[normalizeDate(k)] = rawAppts[k];
 });
 appointments = normAppts;
-    // Load habits
-    if (data.habits) {
-      habits = data.habits;
-    }
     localSave(); setSync("idle"); renderAll();
   });
 }
@@ -696,95 +658,6 @@ function setFilter(f) {
 
 function eh(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-// ── HABITS ───────────────────────────────────────────────────────────────
-function addHabit() {
-  var inp = document.getElementById("habit-add-inp");
-  var name = inp.value.trim();
-  if (!name) return;
-  habits.push({ id: makeUUID(), name: name, completions: {} });
-  inp.value = "";
-  localSave();
-  renderHabits();
-  saveHabitsToSheet();
-}
-
-function deleteHabit(id) {
-  if (!confirm("Delete this habit?")) return;
-  habits = habits.filter(function(h){ return h.id !== id; });
-  localSave();
-  renderHabits();
-  saveHabitsToSheet();
-}
-
-function toggleHabit(id, dateStr) {
-  var habit = habits.find(function(h){ return h.id === id; });
-  if (!habit) return;
-  if (!habit.completions) habit.completions = {};
-  if (habit.completions[dateStr]) delete habit.completions[dateStr];
-  else habit.completions[dateStr] = true;
-  localSave();
-  renderHabits();
-  saveHabitsToSheet();
-}
-
-function saveHabitsToSheet() {
-  apiPost({ action: "saveHabits", habits: habits });
-}
-
-function renderHabits() {
-  var wrap = document.getElementById("habit-table-wrap");
-  if (!wrap) return;
-  var days = getWeekDays();
-  var t    = todayStr();
-  var dayLabels = ["M","T","W","R","F","S","S"];
-
-  if (habits.length === 0) {
-    wrap.innerHTML = '<div style="font-size:.75rem;color:var(--color-text-tertiary);padding:.25rem 0">No habits yet — add one above.</div>';
-    return;
-  }
-
-  var html = '<table class="habit-table"><thead><tr>';
-  html += '<th class="habit-name-col">Habit</th>';
-  for (var i = 0; i < days.length; i++) {
-    var isToday = days[i] === t;
-    html += '<th class="'+(isToday?"habit-today-hd":"")+'" title="'+days[i]+'">'+dayLabels[i]+'</th>';
-  }
-  html += '<th></th></tr></thead><tbody>';
-
-  for (var hi = 0; hi < habits.length; hi++) {
-    var habit = habits[hi];
-    var comps = habit.completions || {};
-    html += '<tr>';
-    html += '<td class="habit-name-cell">'+eh(habit.name)+'</td>';
-    for (var di = 0; di < days.length; di++) {
-      var dateStr = days[di];
-      var done    = !!comps[dateStr];
-      var isToday2 = dateStr === t;
-      var btnCls  = "habit-check" + (done?" done":"") + (isToday2&&!done?" today-col":"");
-      html += '<td>'
-        +'<button class="'+btnCls+'" data-hid="'+habit.id+'" data-date="'+dateStr+'">'
-        +(done?'<i class="ti ti-check" style="pointer-events:none" aria-hidden="true"></i>':'')
-        +'</button>'
-        +'</td>';
-    }
-    html += '<td><button class="habit-del" data-hid="'+habit.id+'" title="Delete habit">'
-      +'<i class="ti ti-trash" style="pointer-events:none" aria-hidden="true"></i>'
-      +'</button></td>';
-    html += '</tr>';
-  }
-
-  html += '</tbody></table>';
-  wrap.innerHTML = html;
-
-  // Wire up click delegation on the table
-  wrap.onclick = function(e) {
-    var chk = e.target.closest(".habit-check");
-    if (chk) { toggleHabit(chk.getAttribute("data-hid"), chk.getAttribute("data-date")); return; }
-    var del = e.target.closest(".habit-del");
-    if (del) { deleteHabit(del.getAttribute("data-hid")); return; }
-  };
-}
-
 function renderWeek() {
   var days=getWeekDays(), t=todayStr(), dayNames=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   var fp=days[0].split("-"), lp=days[6].split("-");
@@ -928,7 +801,7 @@ function renderTasks() {
   area.innerHTML=banner+tableHtml;
 }
 
-function renderAll() { renderWeek(); renderHabits(); renderTasks(); }
+function renderAll() { renderWeek(); renderTasks(); }
 
 document.getElementById("task-area").addEventListener("click",function(e){
   // Expand/collapse toggle
@@ -946,8 +819,6 @@ document.getElementById("task-area").addEventListener("click",function(e){
   var del=e.target.closest(".del"); if(del){deleteTask(del.getAttribute("data-id"));return;}
 });
 document.getElementById("new-task-btn").addEventListener("click",function(){openModal(null);});
-document.getElementById("habit-add-btn").addEventListener("click", addHabit);
-document.getElementById("habit-add-inp").addEventListener("keydown", function(e){ if(e.key==="Enter") addHabit(); });
 document.getElementById("modal-cancel").addEventListener("click",closeModal);
 document.getElementById("modal-save").addEventListener("click",saveTaskForm);
 document.getElementById("modal-bg").addEventListener("click",function(e){if(e.target===this)closeModal();});
