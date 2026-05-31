@@ -480,6 +480,7 @@ function localLoad() {
     // Ensure subtask completedDates arrays exist
     tasks = tasks.map(function(t) {
       if (!t.subtasks) t.subtasks = [];
+      t.permanentlyDone = !!t.permanentlyDone;
       t.subtasks = t.subtasks.map(function(st) {
         if (!st.completedDates) st.completedDates = [];
         return st;
@@ -493,6 +494,10 @@ function loadData() {
   localLoad(); renderAll(); setSync("syncing","Loading...");
   apiGet().then(function(data){
     if(!data||!data.ok){ setSync(NO_API?"idle":"error",NO_API?"Local only":"Offline"); return; }
+    // Build a lookup of local permanentlyDone state before overwriting
+    var localDoneMap = {};
+    tasks.forEach(function(lt) { if (lt.permanentlyDone) localDoneMap[lt.id] = true; });
+
     tasks=(data.tasks||[]).map(function(t){
     t.startDate=normalizeDate(t.startDate);
     t.dueDate=normalizeDate(t.dueDate);
@@ -506,6 +511,9 @@ function loadData() {
       if (!st.completedDates) st.completedDates = [];
       return st;
     });
+    // Normalize permanentlyDone - preserve local state if sheet hasn't caught up yet
+    var sheetDone = (t.permanentlyDone === true || t.permanentlyDone === "true" || t.permanentlyDone === "TRUE");
+    t.permanentlyDone = sheetDone || !!localDoneMap[t.id];
     return t;
   });
     var merged={};
