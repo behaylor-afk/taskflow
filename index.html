@@ -352,8 +352,7 @@ function isDueToday(task)  { return task.dueDate === todayStr(); }
 function isCompleted(id) {
   var task = tasks.find(function(t){return t.id===id;});
   if (!task) return false;
-  if (task.recurrence === "none") return !!task.permanentlyDone;
-  return !!completions[id+"|"+todayStr()];
+  return !!task.permanentlyDone;
 }
 
 function normalizeDate(val) {
@@ -598,27 +597,31 @@ function toggleComplete(id) {
   var task = tasks.find(function(t){return t.id===id;});
   if (!task) return;
 
-  if (task.recurrence === "none") {
-    // One-time task: permanently done/undone
-    task.permanentlyDone = !task.permanentlyDone;
-    apiPost({action:"saveTask", task:task});
-    localSave(); renderAll();
-  } else {
-    // Recurring task: track by date, spawn next on completion
+  if (task.permanentlyDone) {
+    // Un-complete: bring back as pending
+    task.permanentlyDone = false;
+    // For recurring tasks also remove from completions
     var key = id+"|"+todayStr();
-    var wasDone = !!completions[key];
-    if (wasDone) {
-      delete completions[key];
-    } else {
-      completions[key] = true;
+    delete completions[key];
+    task.completedDates = (task.completedDates||[]).filter(function(d){ return d !== todayStr(); });
+  } else {
+    // Complete: permanently done for both one-time AND recurring
+    task.permanentlyDone = true;
+    if (task.recurrence !== "none") {
+      // Record completion date for history and spawn next occurrence
+      var key2 = id+"|"+todayStr();
+      completions[key2] = true;
+      task.completedDates = task.completedDates || [];
+      if (task.completedDates.indexOf(todayStr()) === -1) {
+        task.completedDates.push(todayStr());
+      }
       spawnNextOccurrence(task);
     }
-    task.completedDates = Object.keys(completions)
-      .filter(function(k){return k.indexOf(id+"|")===0;})
-      .map(function(k){return k.slice(id.length+1);});
-    apiPost({action:"saveTask", task:task});
-    localSave(); renderAll();
   }
+
+  apiPost({action:"saveTask", task:task});
+  localSave();
+  renderAll();
 }
 
 function addAppt(date,text) {
