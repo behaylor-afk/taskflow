@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>TaskFlow</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+
 <style>
 :root {
   --color-bg: #FAF9F7;
@@ -248,7 +248,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 <div id="week-strip">
   <div id="week-header">
     <div class="brand">
-      <div class="brand-icon"><i class="ti ti-check" aria-hidden="true"></i></div>
+      <div class="brand-icon" style="font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center">&#10003;</div>
       <span class="brand-name">TaskFlow</span>
     </div>
     <div class="wk-meta">
@@ -273,12 +273,12 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
       </div>
     </div>
     <div class="search-wrap">
-      <i class="ti ti-search search-icon" aria-hidden="true"></i>
+      <span class="search-icon" style="font-size:13px">🔍</span>
       <input class="search-inp" id="search-inp" placeholder="Search tasks..." autocomplete="off"/>
-      <button class="search-clear" id="search-clear" title="Clear search"><i class="ti ti-x" style="pointer-events:none" aria-hidden="true"></i></button>
+      <button class="search-clear" id="search-clear" title="Clear search">×</button>
     </div>
     <button class="new-btn" id="new-task-btn">
-      <i class="ti ti-plus" aria-hidden="true" style="font-size:14px"></i>
+      <span style="font-size:14px;pointer-events:none;font-weight:300;line-height:1">+</span>
       New task
     </button>
   </div>
@@ -289,7 +289,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
   <div class="notes-header">
     <span class="notes-title">Notes</span>
     <button class="notes-add-btn" id="notes-add-btn">
-      <i class="ti ti-plus" style="font-size:13px;pointer-events:none" aria-hidden="true"></i>
+      <span style="font-size:14px;pointer-events:none;font-weight:300;line-height:1">+</span>
       Add note
     </button>
   </div>
@@ -576,9 +576,9 @@ function renderModalSubtasks() {
   if (modalSubtasks.length === 0) { list.innerHTML = ""; return; }
   list.innerHTML = modalSubtasks.map(function(st, i) {
     return '<div class="subtask-edit-item">'
-      + '<i class="ti ti-grip-vertical" style="color:var(--color-text-tertiary);font-size:13px" aria-hidden="true"></i>'
+      + '<span style="color:var(--color-text-tertiary);font-size:11px;pointer-events:none">⠿</span>'
       + '<span>' + eh(st.name) + '</span>'
-      + '<button class="subtask-del-btn" data-idx="' + i + '" title="Remove"><i class="ti ti-x" aria-hidden="true"></i></button>'
+      + '<button class="subtask-del-btn" data-idx="' + i + '" title="Remove">×</button>'
       + '</div>';
   }).join("");
 }
@@ -807,14 +807,14 @@ function renderWeek() {
     if(appts.length===0){ apptHtml='<div class="appt-empty">—</div>'; }
     else { for(var ai=0;ai<appts.length;ai++){
       apptHtml+='<div class="appt-item"><div class="appt-dot"></div><span class="appt-txt">'+eh(appts[ai])+'</span>'
-        +'<button class="appt-del" data-date="'+date+'" data-idx="'+ai+'"><i class="ti ti-x" aria-hidden="true"></i></button></div>';
+        +'<button class="appt-del" data-date="'+date+'" data-idx="'+ai+'">×</button></div>';
     }}
     html+='<div class="'+cls+'">'
       +'<div class="day-hd"><div class="day-lbl">'+dayNames[i]+'</div><div class="day-num">'+dayNum+'</div></div>'
       +'<div class="appt-list">'+apptHtml+'</div>'
       +'<div class="appt-input-row">'
       +'<input class="appt-inp" id="ai-'+date+'" placeholder="+" data-date="'+date+'"/>'
-      +'<button class="appt-add" id="ab-'+date+'" data-date="'+date+'" style="display:none"><i class="ti ti-plus" aria-hidden="true"></i></button>'
+      +'<button class="appt-add" id="ab-'+date+'" data-date="'+date+'" style="display:none"><span style="pointer-events:none;font-weight:300;font-size:14px;line-height:1">+</span></button>'
       +'</div></div>';
   }
   document.getElementById("week-grid").innerHTML=html;
@@ -885,17 +885,17 @@ function renderNotes() {
       ? '<div class="note-img-wrap">'
         + '<img class="note-img" src="'+note.imageData+'" alt="note image"/>'
         + '<button class="note-img-del" data-noteid="'+note.id+'" title="Remove image">'
-        + '<i class="ti ti-x" style="pointer-events:none;font-size:9px" aria-hidden="true"></i>'
+        + '×'
         + '</button>'
         + '</div>'
       : '';
 
     return '<div class="note-card" draggable="true" data-noteid="'+note.id+'">'
       +'<div class="note-card-header">'
-      +'<i class="ti ti-grip-horizontal note-drag-handle" aria-hidden="true" style="pointer-events:none"></i>'
+      +'<span class="note-drag-handle" style="pointer-events:none;letter-spacing:1px;font-size:10px;color:var(--color-text-tertiary)">⠿</span>'
       +'<input class="note-title-inp" placeholder="Title..." value="'+eh(note.title||"")+'" data-noteid="'+note.id+'" />'
       +'<button class="note-del-btn" data-noteid="'+note.id+'" title="Delete note">'
-      +'<i class="ti ti-trash" aria-hidden="true" style="pointer-events:none"></i>'
+      +'<span style="pointer-events:none;font-size:12px">&#128465;</span>'
       +'</button>'
       +'</div>'
       + imgSection
@@ -1060,11 +1060,11 @@ function renderTasks() {
   var area=document.getElementById("task-area");
 
   if(!combined.length){
-    area.innerHTML='<div class="empty-state"><i class="ti ti-checkbox" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.3" aria-hidden="true"></i><div style="font-size:.875rem;font-weight:500;margin-bottom:.25rem">No tasks to show</div><div style="font-size:.8rem">Click "New task" to get started</div></div>';
+    area.innerHTML='<div class="empty-state"><span style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.3">☐</span><div style="font-size:.875rem;font-weight:500;margin-bottom:.25rem">No tasks to show</div><div style="font-size:.8rem">Click "New task" to get started</div></div>';
     return;
   }
 
-  var banner=NO_API?'<div class="no-api-banner"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0;margin-top:1px" aria-hidden="true"></i><span>Google Sheets not connected — data is saved locally on this device only.</span></div>':"";
+  var banner=NO_API?'<div class="no-api-banner"><span style="font-size:15px;flex-shrink:0;margin-top:1px;pointer-events:none">⚠</span><span>Google Sheets not connected — data is saved locally on this device only.</span></div>':"";
 
   var rows="";
   for(var i=0;i<combined.length;i++){
@@ -1088,13 +1088,13 @@ function renderTasks() {
     // Expand/collapse toggle shown only if task has subtasks
     var expandBtn = hasSubtasks
       ? '<button class="expand-btn" data-id="'+task.id+'" title="'+(isExpanded?"Hide":"Show")+' subtasks" style="background:none;border:none;cursor:pointer;padding:0 0 0 .3rem;color:var(--color-text-tertiary);font-size:12px;vertical-align:middle;line-height:1">'
-        +'<i class="ti ti-chevron-'+(isExpanded?"up":"down")+'" aria-hidden="true" style="pointer-events:none;font-size:12px"></i></button>'
+        +'<span style="pointer-events:none;font-size:11px">'+(isExpanded?"▲":"▼")+'</span></button>'
       : "";
     // Parent is only truly done if all subtasks are also done
     var effectiveDone = done2 && allSubtasksDone(task);
     var chkClass = effectiveDone ? "chkbox checked" : "chkbox";
     rows+='<tr class="'+rowCls+'">'
-      +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')+'</button></td>'
+      +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<span style="pointer-events:none;font-size:10px">✓</span>':'')+'</button></td>'
       +'<td class="td-name">'+highlightMatch(task.name)+critBadge+recBadge+progBadge+expandBtn+'</td>'
       +'<td class="td-ent">'+highlightMatch(task.entity||"")+'</td>'
       +'<td class="td-start">'+fmtDate(task.startDate)+'</td>'
@@ -1103,8 +1103,8 @@ function renderTasks() {
       +'<button class="act-btn critical-toggle" data-id="'+task.id+'" title="'+(task.critical?"Remove critical":"Mark critical")+'" style="'+(task.critical?'background:var(--color-coral-bg);border-color:var(--color-coral);color:var(--color-coral)':'')+'">'
       +'<i class="ti ti-'+(task.critical?'star-filled':'star')+'" aria-hidden="true" style="font-size:13px"></i>'
       +'</button>'
-      +'<button class="act-btn edit-btn" data-id="'+task.id+'" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button>'
-      +'<button class="act-btn del" data-id="'+task.id+'" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button>'
+      +'<button class="act-btn edit-btn" data-id="'+task.id+'" title="Edit"><span style="font-size:12px;pointer-events:none">✎</span></button>'
+      +'<button class="act-btn del" data-id="'+task.id+'" title="Delete"><span style="font-size:12px;pointer-events:none">🗑</span></button>'
       +'</div></td></tr>';
     // Render subtask rows only when expanded
     if (hasSubtasks && isExpanded) {
@@ -1116,11 +1116,11 @@ function renderTasks() {
         rows += '<tr class="'+stCls+'" data-taskid="'+task.id+'" data-stid="'+st.id+'" class="subtask-tr" style="cursor:pointer">'
           +'<td class="td-chk">'
           +'<span class="'+stChkCls+'" style="pointer-events:none">'
-          +(stDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')
+          +(stDone?'<span style="pointer-events:none;font-size:10px">✓</span>':'')
           +'</span>'
           +'</td>'
           +'<td class="td-name" colspan="4" style="color:var(--color-text-secondary);font-weight:400;padding-left:1.75rem">'
-          +'<i class="ti ti-corner-down-right" style="font-size:11px;margin-right:.35rem;color:var(--color-text-tertiary);pointer-events:none" aria-hidden="true"></i>'
+          +'<span style="font-size:11px;margin-right:.35rem;color:var(--color-text-tertiary);pointer-events:none">↳</span>'
           +eh(st.name)
           +'</td>'
           +'</tr>';
@@ -1195,4 +1195,4 @@ document.getElementById("today-str").textContent=new Date().toLocaleDateString("
 loadData();
 </script>
 </body>
-</html>v
+</html>
