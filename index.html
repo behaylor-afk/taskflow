@@ -210,6 +210,12 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 .note-title-inp::placeholder{color:var(--color-text-tertiary)}
 .note-del-btn{background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:13px;padding:0;opacity:.4;flex-shrink:0}
 .note-del-btn:hover{opacity:1;color:var(--color-danger)}
+.note-img-wrap{position:relative;line-height:0}
+.note-img{width:100%;max-height:140px;object-fit:cover;display:block;border-bottom:0.5px solid var(--color-border);cursor:pointer}
+.note-img-del{position:absolute;top:.3rem;right:.3rem;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px}
+.note-img-del:hover{background:var(--color-danger)}
+.note-paste-hint{font-size:.65rem;color:var(--color-text-tertiary);text-align:center;padding:.3rem .5rem;opacity:.6;user-select:none;font-style:italic}
+.note-body-inp.paste-active{border:1.5px dashed var(--color-accent-mid);background:var(--color-accent-bg)}
 .note-body-inp{width:100%;min-height:60px;max-height:120px;padding:.3rem .5rem;background:transparent;border:none;outline:none;font-size:.75rem;color:var(--color-text-primary);font-family:inherit;resize:vertical;line-height:1.45;display:block}
 .note-body-inp::placeholder{color:var(--color-text-tertiary)}
 @media(max-width:600px){.notes-grid{grid-template-columns:1fr}}
@@ -875,6 +881,15 @@ function renderNotes() {
   }
 
   grid.innerHTML = sorted.map(function(note) {
+    var imgSection = note.imageData
+      ? '<div class="note-img-wrap">'
+        + '<img class="note-img" src="'+note.imageData+'" alt="note image"/>'
+        + '<button class="note-img-del" data-noteid="'+note.id+'" title="Remove image">'
+        + '<i class="ti ti-x" style="pointer-events:none;font-size:9px" aria-hidden="true"></i>'
+        + '</button>'
+        + '</div>'
+      : '';
+
     return '<div class="note-card" draggable="true" data-noteid="'+note.id+'">'
       +'<div class="note-card-header">'
       +'<i class="ti ti-grip-horizontal note-drag-handle" aria-hidden="true" style="pointer-events:none"></i>'
@@ -883,7 +898,8 @@ function renderNotes() {
       +'<i class="ti ti-trash" aria-hidden="true" style="pointer-events:none"></i>'
       +'</button>'
       +'</div>'
-      +'<textarea class="note-body-inp" placeholder="Write your note..." data-noteid="'+note.id+'">'+eh(note.body||"")+'</textarea>'
+      + imgSection
+      +'<textarea class="note-body-inp" placeholder="Type a note or paste an image (Ctrl+V / Cmd+V)..." data-noteid="'+note.id+'"></textarea>'
       +'</div>';
   }).join("");
 
@@ -901,12 +917,65 @@ function wireNoteEvents() {
     inp.addEventListener("change", function(){ updateNoteTitle(this.getAttribute("data-noteid"), this.value); });
   });
 
-  // Body textareas
+  // Body textareas — text changes and paste
   grid.querySelectorAll(".note-body-inp").forEach(function(ta) {
-    ta.addEventListener("change", function(){ updateNoteBody(this.getAttribute("data-noteid"), this.value); });
+    var nid = ta.getAttribute("data-noteid");
+    var note = notes.find(function(n){ return n.id === nid; });
+    // Set existing text value
+    if (note) ta.value = note.body || "";
+
+    ta.addEventListener("change", function(){ updateNoteBody(nid, this.value); });
+
+    // Paste handler — intercept image pastes
+    ta.addEventListener("paste", function(e) {
+      var items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          e.preventDefault();
+          var file   = items[i].getAsFile();
+          var reader = new FileReader();
+          reader.onload = (function(noteId) {
+            return function(ev) {
+              var dataUrl = ev.target.result;
+              // Compress if > 800KB
+              var img = new Image();
+              img.onload = function() {
+                var maxW = 800, maxH = 600;
+                var w = img.width, h = img.height;
+                if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+                var canvas = document.createElement("canvas");
+                canvas.width = w; canvas.height = h;
+                canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                var compressed = canvas.toDataURL("image/jpeg", 0.75);
+                var n = notes.find(function(n){ return n.id === noteId; });
+                if (n) {
+                  n.imageData = compressed;
+                  saveNotes();
+                  renderNotes();
+                }
+              };
+              img.src = dataUrl;
+            };
+          })(nid);
+          reader.readAsDataURL(file);
+          return;
+        }
+      }
+    });
   });
 
-  // Delete buttons
+  // Image delete buttons
+  grid.querySelectorAll(".note-img-del").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var nid = this.getAttribute("data-noteid");
+      var n   = notes.find(function(n){ return n.id === nid; });
+      if (n) { n.imageData = null; saveNotes(); renderNotes(); }
+    });
+  });
+
+  // Delete note buttons
   grid.querySelectorAll(".note-del-btn").forEach(function(btn) {
     btn.addEventListener("click", function(){ deleteNote(this.getAttribute("data-noteid")); });
   });
@@ -1126,4 +1195,4 @@ document.getElementById("today-str").textContent=new Date().toLocaleDateString("
 loadData();
 </script>
 </body>
-</html>
+</html>v
