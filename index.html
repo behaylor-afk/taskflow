@@ -195,22 +195,22 @@ tbody tr.row-critical{border-left:3px solid var(--color-coral)}
 tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 /* ── Notes ── */
-#notes-section{padding:1rem 1.25rem 2rem;min-height:25vh}
-.notes-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+#notes-section{padding:.625rem 1.25rem 1rem}
+.notes-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
 .notes-title{font-size:.72rem;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em}
 .notes-add-btn{background:var(--color-accent-mid);color:#fff;border:none;border-radius:var(--radius-md);padding:.3rem .7rem;font-size:.72rem;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:.3rem}
-.notes-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.notes-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .note-card{background:var(--color-surface);border:0.5px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;cursor:grab;transition:box-shadow .15s,opacity .15s;position:relative}
 .note-card:active{cursor:grabbing}
 .note-card.dragging{opacity:.4;box-shadow:0 8px 24px rgba(0,0,0,.15)}
 .note-card.drag-over{border-color:var(--color-accent-mid);box-shadow:0 0 0 2px var(--color-accent-bg)}
-.note-card-header{display:flex;align-items:center;gap:.4rem;padding:.4rem .5rem .35rem;border-bottom:0.5px solid var(--color-border);background:var(--color-surface-2)}
+.note-card-header{display:flex;align-items:center;gap:.35rem;padding:.28rem .45rem;border-bottom:0.5px solid var(--color-border);background:var(--color-surface-2)}
 .note-drag-handle{color:var(--color-text-tertiary);font-size:13px;cursor:grab;flex-shrink:0}
 .note-title-inp{flex:1;background:transparent;border:none;outline:none;font-size:.75rem;font-weight:600;color:var(--color-text-primary);font-family:inherit;min-width:0}
 .note-title-inp::placeholder{color:var(--color-text-tertiary)}
 .note-del-btn{background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:13px;padding:0;opacity:.4;flex-shrink:0}
 .note-del-btn:hover{opacity:1;color:var(--color-danger)}
-.note-body-inp{width:100%;min-height:120px;padding:.5rem .6rem;background:transparent;border:none;outline:none;font-size:.78rem;color:var(--color-text-primary);font-family:inherit;resize:vertical;line-height:1.5;display:block}
+.note-body-inp{width:100%;min-height:60px;max-height:120px;padding:.3rem .5rem;background:transparent;border:none;outline:none;font-size:.75rem;color:var(--color-text-primary);font-family:inherit;resize:vertical;line-height:1.45;display:block}
 .note-body-inp::placeholder{color:var(--color-text-tertiary)}
 @media(max-width:600px){.notes-grid{grid-template-columns:1fr}}
 
@@ -353,7 +353,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 </div>
 
 <script>
-var API_URL = "https://script.google.com/macros/s/AKfycbxtCKS5BMEetDAM4QGm7WYzXCjwzCJ9KZgn6M_eg6DrSRSP6UB1A3fIjrclbnZKCVR_/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
