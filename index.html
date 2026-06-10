@@ -145,7 +145,7 @@ tbody tr.row-done{opacity:.5}
 .chip-overdue{background:var(--color-coral-bg);color:var(--color-coral-text);border-color:rgba(216,90,48,.2)}
 .chip-today{background:var(--color-accent-bg);color:var(--color-accent-text);border-color:rgba(186,117,23,.25)}
 .chip-active{background:var(--color-accent-bg);color:var(--color-accent-text);border-color:rgba(186,117,23,.2)}
-.td-act{width:56px;text-align:right;padding-right:.5rem}
+.td-act{width:80px;text-align:right;padding-right:.5rem}
 .act-btns{display:flex;gap:.2rem;justify-content:flex-end}
 .act-btn{background:transparent;border:0.5px solid var(--color-border);border-radius:var(--radius-sm);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-tertiary);font-size:13px;transition:all .12s}
 .act-btn:hover{background:var(--color-surface-2);border-color:var(--color-border-strong);color:var(--color-text-primary)}
@@ -309,7 +309,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 </div>
 
 <script>
-var API_URL = "https://script.google.com/macros/s/AKfycby2j32loTxidaMVJN1QAIUErGLybh10PjIovCHbg3rEdlRNW15D5dWVq1scIQhC4ftx/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -658,6 +658,15 @@ function removeAppt(date,idx) {
   localSave(); renderWeek(); apiPost({action:"saveAppts",date:date,appts:appointments[date]});
 }
 
+function toggleCriticalInline(id) {
+  var task = tasks.find(function(t){ return t.id === id; });
+  if (!task) return;
+  task.critical = !task.critical;
+  localSave();
+  renderTasks();
+  apiPost({action:"saveTask", task:task});
+}
+
 var modalCritical = false;
 
 function toggleCriticalModal() {
@@ -839,6 +848,9 @@ function renderTasks() {
       +'<td class="td-start">'+fmtDate(task.startDate)+'</td>'
       +'<td class="td-due"><span class="'+chipCls+'">'+fmtDate(task.dueDate)+'</span></td>'
       +'<td class="td-act"><div class="act-btns">'
+      +'<button class="act-btn critical-toggle" data-id="'+task.id+'" title="'+(task.critical?"Remove critical":"Mark critical")+'" style="'+(task.critical?'background:var(--color-coral-bg);border-color:var(--color-coral);color:var(--color-coral)':'')+'">'
+      +'<i class="ti ti-'+(task.critical?'star-filled':'star')+'" aria-hidden="true" style="font-size:13px"></i>'
+      +'</button>'
       +'<button class="act-btn edit-btn" data-id="'+task.id+'" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button>'
       +'<button class="act-btn del" data-id="'+task.id+'" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button>'
       +'</div></td></tr>';
@@ -881,6 +893,9 @@ function renderTasks() {
 function renderAll() { renderWeek(); renderTasks(); }
 
 document.getElementById("task-area").addEventListener("click",function(e){
+  // Critical star toggle
+  var critBtn=e.target.closest(".critical-toggle");
+  if(critBtn){ toggleCriticalInline(critBtn.getAttribute("data-id")); return; }
   // Expand/collapse toggle
   var expBtn=e.target.closest(".expand-btn");
   if(expBtn){ toggleExpand(expBtn.getAttribute("data-id")); return; }
