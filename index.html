@@ -179,6 +179,15 @@ tbody tr.row-done{opacity:.5}
 .subtask-add-inp:focus{border-color:var(--color-accent-mid)}
 .subtask-add-btn{background:var(--color-accent-mid);color:#fff;border:none;border-radius:var(--radius-sm);padding:.35rem .65rem;font-size:.75rem;cursor:pointer;white-space:nowrap}
 
+/* ── Search ── */
+.search-wrap{position:relative;display:flex;align-items:center}
+.search-inp{background:var(--color-surface-2);border:0.5px solid var(--color-border-strong);border-radius:var(--radius-md);color:var(--color-text-primary);padding:.32rem .65rem .32rem 1.9rem;font-size:.775rem;outline:none;width:180px;transition:border-color .15s,width .2s}
+.search-inp:focus{border-color:var(--color-accent-mid);width:220px}
+.search-inp::placeholder{color:var(--color-text-tertiary)}
+.search-icon{position:absolute;left:.55rem;color:var(--color-text-tertiary);font-size:13px;pointer-events:none}
+.search-clear{position:absolute;right:.5rem;background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:12px;padding:0;display:none;line-height:1}
+.search-clear.visible{display:flex;align-items:center}
+
 /* ── Critical task ── */
 .critical-badge{display:inline-flex;align-items:center;gap:.2rem;margin-left:.4rem;font-size:.6rem;font-weight:700;color:#fff;background:var(--color-coral);padding:.1rem .35rem;border-radius:4px;text-transform:uppercase;letter-spacing:.04em;vertical-align:middle;border:none}
 tbody tr.row-critical td.td-name{font-weight:700;color:var(--color-text-primary)}
@@ -236,6 +245,11 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
         <span id="sync-lbl">Loading...</span>
         <button onclick="loadData()" style="background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:11px;padding:0 4px;text-decoration:underline">Sync</button>
       </div>
+    </div>
+    <div class="search-wrap">
+      <i class="ti ti-search search-icon" aria-hidden="true"></i>
+      <input class="search-inp" id="search-inp" placeholder="Search tasks..." autocomplete="off"/>
+      <button class="search-clear" id="search-clear" title="Clear search"><i class="ti ti-x" style="pointer-events:none" aria-hidden="true"></i></button>
     </div>
     <button class="new-btn" id="new-task-btn">
       <i class="ti ti-plus" aria-hidden="true" style="font-size:14px"></i>
@@ -317,6 +331,7 @@ var appointments = {};
 var completions  = {};
 var curFilter    = "due";
 var expandedTasks = {}; // taskId -> true/false
+var searchQuery   = "";
 var editingId    = null;
 
 function todayStr() {
@@ -782,6 +797,18 @@ function renderWeek() {
   });
 }
 
+function highlightMatch(str) {
+  if (!searchQuery || !str) return eh(str);
+  var q    = searchQuery;
+  var idx  = str.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return eh(str);
+  return eh(str.slice(0, idx))
+    + '<mark style="background:var(--color-accent-bg);color:var(--color-accent-text);border-radius:2px;padding:0 1px">'
+    + eh(str.slice(idx, idx + q.length))
+    + '</mark>'
+    + eh(str.slice(idx + q.length));
+}
+
 function renderTasks() {
   var t=todayStr(), sorted=sortTasks(tasks);
   var showList=(curFilter==="due")
@@ -790,6 +817,15 @@ function renderTasks() {
 
   // Exclude permanently done one-time tasks from all views (they are done, gone)
   // but show them at the bottom as struck-through so user can undo
+  // Apply search filter
+  if (searchQuery) {
+    var q = searchQuery.toLowerCase();
+    showList = showList.filter(function(task){
+      return task.name.toLowerCase().indexOf(q) !== -1 ||
+             (task.entity && task.entity.toLowerCase().indexOf(q) !== -1);
+    });
+  }
+
   var activePending = showList.filter(function(task){
     return !isCompleted(task.id);
   });
@@ -843,8 +879,8 @@ function renderTasks() {
     var chkClass = effectiveDone ? "chkbox checked" : "chkbox";
     rows+='<tr class="'+rowCls+'">'
       +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<i class="ti ti-check" aria-hidden="true" style="pointer-events:none"></i>':'')+'</button></td>'
-      +'<td class="td-name">'+eh(task.name)+critBadge+recBadge+progBadge+expandBtn+'</td>'
-      +'<td class="td-ent">'+eh(task.entity||"")+'</td>'
+      +'<td class="td-name">'+highlightMatch(task.name)+critBadge+recBadge+progBadge+expandBtn+'</td>'
+      +'<td class="td-ent">'+highlightMatch(task.entity||"")+'</td>'
       +'<td class="td-start">'+fmtDate(task.startDate)+'</td>'
       +'<td class="td-due"><span class="'+chipCls+'">'+fmtDate(task.dueDate)+'</span></td>'
       +'<td class="td-act"><div class="act-btns">'
@@ -911,6 +947,21 @@ document.getElementById("task-area").addEventListener("click",function(e){
   var del=e.target.closest(".del"); if(del){deleteTask(del.getAttribute("data-id"));return;}
 });
 document.getElementById("new-task-btn").addEventListener("click",function(){openModal(null);});
+
+// Search
+document.getElementById("search-inp").addEventListener("input", function() {
+  searchQuery = this.value.trim();
+  var clearBtn = document.getElementById("search-clear");
+  if (searchQuery) clearBtn.classList.add("visible");
+  else             clearBtn.classList.remove("visible");
+  renderTasks();
+});
+document.getElementById("search-clear").addEventListener("click", function() {
+  searchQuery = "";
+  document.getElementById("search-inp").value = "";
+  this.classList.remove("visible");
+  renderTasks();
+});
 document.getElementById("modal-cancel").addEventListener("click",closeModal);
 document.getElementById("modal-save").addEventListener("click",saveTaskForm);
 document.getElementById("modal-bg").addEventListener("click",function(e){if(e.target===this)closeModal();});
