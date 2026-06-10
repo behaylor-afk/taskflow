@@ -852,7 +852,6 @@ function addNote() {
 }
 
 function deleteNote(id) {
-  if (!confirm("Delete this note?")) return;
   notes = notes.filter(function(n){return n.id!==id;});
   saveNotes();
   renderNotes();
