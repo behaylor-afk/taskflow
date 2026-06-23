@@ -94,7 +94,11 @@ select option{background:var(--color-surface)}
 .day-col.is-past .day-num{opacity:.4}
 .appt-list{flex:1;overflow-y:auto;padding:.3rem .3rem .2rem}
 .appt-empty{font-size:.6rem;color:var(--color-text-tertiary);text-align:center;padding:.5rem 0;opacity:.5}
-.appt-item{display:flex;align-items:flex-start;gap:.2rem;padding:.2rem .25rem;margin-bottom:.18rem;background:var(--color-surface);border-radius:var(--radius-sm);border:0.5px solid var(--color-border)}
+.appt-item{display:flex;align-items:flex-start;gap:.2rem;padding:.2rem .25rem;margin-bottom:.18rem;background:var(--color-surface);border-radius:var(--radius-sm);border:0.5px solid var(--color-border);cursor:grab;transition:opacity .15s,box-shadow .15s;user-select:none}
+.appt-item.dragging{opacity:.35;cursor:grabbing}
+.appt-item.drag-over-top{border-top:2px solid var(--color-accent-mid)}
+.appt-item.drag-over-bottom{border-bottom:2px solid var(--color-accent-mid)}
+.appt-drag-handle{font-size:9px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:.25rem;cursor:grab;pointer-events:none;letter-spacing:1px}
 .day-col.is-today .appt-item{background:rgba(239,159,39,.08);border-color:rgba(186,117,23,.2)}
 .appt-dot{width:4px;height:4px;border-radius:50%;flex-shrink:0;margin-top:.25rem;background:var(--color-text-tertiary)}
 .day-col.is-today .appt-dot{background:var(--color-accent)}
@@ -710,6 +714,15 @@ function removeAppt(date,idx) {
   localSave(); renderWeek(); apiPost({action:"saveAppts",date:date,appts:appointments[date]});
 }
 
+function moveAppt(date, fromIdx, toIdx) {
+  if (!appointments[date]) return;
+  if (fromIdx === toIdx) return;
+  var arr = appointments[date];
+  var item = arr.splice(fromIdx, 1)[0];
+  arr.splice(toIdx, 0, item);
+  localSave(); renderWeek(); apiPost({action:"saveAppts", date:date, appts:appointments[date]});
+}
+
 function toggleCriticalInline(id) {
   var task = tasks.find(function(t){ return t.id === id; });
   if (!task) return;
@@ -806,8 +819,11 @@ function renderWeek() {
     var apptHtml="";
     if(appts.length===0){ apptHtml='<div class="appt-empty">—</div>'; }
     else { for(var ai=0;ai<appts.length;ai++){
-      apptHtml+='<div class="appt-item"><div class="appt-dot"></div><span class="appt-txt">'+eh(appts[ai])+'</span>'
-        +'<button class="appt-del" data-date="'+date+'" data-idx="'+ai+'">×</button></div>';
+      apptHtml+='<div class="appt-item" draggable="true" data-date="'+date+'" data-idx="'+ai+'">'
+        +'<span class="appt-drag-handle">⠿</span>'
+        +'<span class="appt-txt">'+eh(appts[ai])+'</span>'
+        +'<button class="appt-del" data-date="'+date+'" data-idx="'+ai+'">×</button>'
+        +'</div>';
     }}
     html+='<div class="'+cls+'">'
       +'<div class="day-hd"><div class="day-lbl">'+dayNames[i]+'</div><div class="day-num">'+dayNum+'</div></div>'
@@ -828,9 +844,56 @@ function renderWeek() {
       btn.addEventListener("click",function(){ if(inp.value.trim()){ addAppt(date,inp.value); inp.value=""; btn.style.display="none"; } });
     })(days[i]);
   }
-  document.getElementById("week-grid").addEventListener("click",function(e){
-    var del=e.target.closest(".appt-del");
-    if(del) removeAppt(del.getAttribute("data-date"),parseInt(del.getAttribute("data-idx"),10));
+  // Click delegation (delete)
+  var weekGrid = document.getElementById("week-grid");
+  weekGrid.addEventListener("click", function(e) {
+    var del = e.target.closest(".appt-del");
+    if (del) removeAppt(del.getAttribute("data-date"), parseInt(del.getAttribute("data-idx"), 10));
+  });
+
+  // Drag-to-reorder within a day column
+  var dragSrcDate = null;
+  var dragSrcIdx  = null;
+
+  weekGrid.addEventListener("dragstart", function(e) {
+    var item = e.target.closest(".appt-item");
+    if (!item) return;
+    dragSrcDate = item.getAttribute("data-date");
+    dragSrcIdx  = parseInt(item.getAttribute("data-idx"), 10);
+    item.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  weekGrid.addEventListener("dragend", function() {
+    weekGrid.querySelectorAll(".appt-item").forEach(function(el) {
+      el.classList.remove("dragging","drag-over-top","drag-over-bottom");
+    });
+  });
+
+  weekGrid.addEventListener("dragover", function(e) {
+    e.preventDefault();
+    var item = e.target.closest(".appt-item");
+    weekGrid.querySelectorAll(".appt-item").forEach(function(el) {
+      el.classList.remove("drag-over-top","drag-over-bottom");
+    });
+    if (!item) return;
+    var rect = item.getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) item.classList.add("drag-over-top");
+    else item.classList.add("drag-over-bottom");
+    e.dataTransfer.dropEffect = "move";
+  });
+
+  weekGrid.addEventListener("drop", function(e) {
+    e.preventDefault();
+    var item = e.target.closest(".appt-item");
+    if (!item) return;
+    var tgtDate = item.getAttribute("data-date");
+    var tgtIdx  = parseInt(item.getAttribute("data-idx"), 10);
+    if (tgtDate !== dragSrcDate || tgtIdx === dragSrcIdx) return;
+    var rect = item.getBoundingClientRect();
+    var insertIdx = (e.clientY >= rect.top + rect.height / 2) ? tgtIdx + 1 : tgtIdx;
+    if (dragSrcIdx < insertIdx) insertIdx--;
+    moveAppt(dragSrcDate, dragSrcIdx, insertIdx);
   });
 }
 
