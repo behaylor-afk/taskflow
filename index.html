@@ -534,9 +534,17 @@ function loadData() {
   localLoad(); renderAll(); setSync("syncing","Loading...");
   apiGet().then(function(data){
     if(!data||!data.ok){ setSync(NO_API?"idle":"error",NO_API?"Local only":"Offline"); return; }
-    // Build a lookup of local permanentlyDone state before overwriting
+    // Preserve local state before sheet overwrites
     var localDoneMap = {};
-    tasks.forEach(function(lt) { if (lt.permanentlyDone) localDoneMap[lt.id] = true; });
+    var localCompletedTodayMap = {};
+    var t = todayStr();
+    tasks.forEach(function(lt) {
+      if (lt.permanentlyDone) localDoneMap[lt.id] = true;
+      // Preserve today's completedDates in case sheet hasn't caught up
+      if (lt.completedDates && lt.completedDates.indexOf(t) !== -1) {
+        localCompletedTodayMap[lt.id] = true;
+      }
+    });
 
     tasks=(data.tasks||[]).map(function(t){
     t.startDate=normalizeDate(t.startDate);
@@ -555,6 +563,13 @@ function loadData() {
     var sheetDone = (t.permanentlyDone === true || t.permanentlyDone === "true" || t.permanentlyDone === "TRUE");
     t.permanentlyDone = sheetDone || !!localDoneMap[t.id];
     t.critical = (t.critical === true || t.critical === "true" || t.critical === "TRUE");
+    // Restore today's completion if local had it but sheet hasn't caught up
+    if (localCompletedTodayMap[t.id]) {
+      t.completedDates = t.completedDates || [];
+      if (t.completedDates.indexOf(todayStr()) === -1) {
+        t.completedDates.push(todayStr());
+      }
+    }
     return t;
   });
     var merged={};
@@ -567,6 +582,7 @@ Object.keys(rawAppts).forEach(function(k) {
   normAppts[normalizeDate(k)] = rawAppts[k];
 });
 appointments = normAppts;
+    if (data.notes) { notes = data.notes; }
     localSave(); setSync("idle"); renderAll();
   });
 }
@@ -977,6 +993,7 @@ function wireNoteEvents() {
   // Title inputs
   grid.querySelectorAll(".note-title-inp").forEach(function(inp) {
     inp.addEventListener("change", function(){ updateNoteTitle(this.getAttribute("data-noteid"), this.value); });
+    inp.addEventListener("blur", function(){ updateNoteTitle(this.getAttribute("data-noteid"), this.value); });
   });
 
   // Body textareas — text changes and paste
@@ -986,7 +1003,14 @@ function wireNoteEvents() {
     // Set existing text value
     if (note) ta.value = note.body || "";
 
-    ta.addEventListener("change", function(){ updateNoteBody(nid, this.value); });
+    // Save on blur (reliable) AND debounced input (catches text before refresh)
+    ta.addEventListener("blur", function(){ updateNoteBody(nid, this.value); });
+    var noteDebounce = null;
+    ta.addEventListener("input", function(){
+      var val = this.value;
+      clearTimeout(noteDebounce);
+      noteDebounce = setTimeout(function(){ updateNoteBody(nid, val); }, 1500);
+    });
 
     // Paste handler — intercept image pastes
     ta.addEventListener("paste", function(e) {
