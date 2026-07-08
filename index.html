@@ -486,25 +486,41 @@ function apiGet() {
   });
 }
 
-// WRITE via JSONP GET — same bypass, carries payload as query param
+// WRITE via POST with text/plain — no CORS preflight, handles large payloads
 function apiPost(body) {
   if (NO_API) return Promise.resolve(null);
   setSync("syncing");
-  return new Promise(function(resolve) {
-    var cb    = "tfwcb_" + Date.now();
-    var script = document.createElement("script");
-    var done  = false;
-    var timer = setTimeout(function() {
-      if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("error","Offline"); resolve(null); }
-    }, 15000);
-    window[cb] = function(data) {
-      if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
-    };
-    script.onerror = function() {
-      if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
-    };
-    script.src = API_URL + "?callback=" + cb + "&payload=" + encodeURIComponent(JSON.stringify(body)) + "&t=" + Date.now();
-    document.head.appendChild(script);
+  return fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(j) { setSync(j && j.ok ? "idle" : "error"); return j; })
+  .catch(function() {
+    // Fallback: short payloads via GET JSONP
+    var payloadStr = JSON.stringify(body);
+    if (payloadStr.length > 1800) {
+      setSync("error", "Payload too large");
+      return null;
+    }
+    setSync("syncing");
+    return new Promise(function(resolve) {
+      var cb = "tfwcb_" + Date.now();
+      var script = document.createElement("script");
+      var done = false;
+      var timer = setTimeout(function() {
+        if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("error","Offline"); resolve(null); }
+      }, 15000);
+      window[cb] = function(data) {
+        if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
+      };
+      script.onerror = function() {
+        if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
+      };
+      script.src = API_URL + "?callback=" + cb + "&payload=" + encodeURIComponent(payloadStr) + "&t=" + Date.now();
+      document.head.appendChild(script);
+    });
   });
 }
 
