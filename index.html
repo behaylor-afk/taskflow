@@ -239,7 +239,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 .notes-title{font-size:.72rem;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em}
 .notes-add-btn{background:var(--color-accent-mid);color:#fff;border:none;border-radius:var(--radius-md);padding:.3rem .7rem;font-size:.72rem;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:.3rem}
 .notes-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem}
-.note-card{background:var(--color-surface);border:0.5px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;cursor:grab;transition:box-shadow .15s,opacity .15s;position:relative}
+.note-card{background:var(--color-surface);border:0.5px solid var(--color-border);border-radius:var(--radius-md);overflow:visible;cursor:grab;transition:box-shadow .15s,opacity .15s;position:relative}
 .note-card:active{cursor:grabbing}
 .note-card.dragging{opacity:.4;box-shadow:0 8px 24px rgba(0,0,0,.15)}
 .note-card.drag-over{border-color:var(--color-accent-mid);box-shadow:0 0 0 2px var(--color-accent-bg)}
@@ -255,7 +255,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 .note-img-del:hover{background:var(--color-danger)}
 .note-paste-hint{font-size:.65rem;color:var(--color-text-tertiary);text-align:center;padding:.3rem .5rem;opacity:.6;user-select:none;font-style:italic}
 .note-body-inp.paste-active{border:1.5px dashed var(--color-accent-mid);background:var(--color-accent-bg)}
-.note-body-inp{width:100%;min-height:60px;max-height:120px;padding:.3rem .5rem;background:transparent;border:none;outline:none;font-size:.75rem;color:var(--color-text-primary);font-family:inherit;resize:vertical;line-height:1.45;display:block}
+.note-body-inp{width:100%;min-height:60px;padding:.3rem .5rem;background:transparent;border:none;outline:none;font-size:.75rem;color:var(--color-text-primary);font-family:inherit;resize:vertical;line-height:1.45;display:block;box-sizing:border-box}
 .note-body-inp::placeholder{color:var(--color-text-tertiary)}
 @media(max-width:600px){.notes-grid{grid-template-columns:1fr 1fr}}
 
@@ -448,7 +448,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 <script>
 
-var API_URL = "https://script.google.com/macros/s/AKfycbyq3YmqLM5tPDBpKyiClfsO7J7IOJdVMpOATdRbRjzuhCYC0pjSwPuW4X_5fXB5tL9G/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -1060,6 +1060,14 @@ function updateNoteBody(id, val) {
   if (n) { n.body = val; saveNotes(); }
 }
 
+function updateNoteHeight(id, height) {
+  var n = notes.find(function(n){return n.id===id;});
+  if (n && height && height !== n.height) {
+    n.height = height;
+    saveNotes();
+  }
+}
+
 function renderNotes() {
   var grid = document.getElementById("notes-grid");
   if (!grid) return;
@@ -1091,7 +1099,7 @@ function renderNotes() {
       +'</button>'
       +'</div>'
       + imgSection
-      +'<textarea class="note-body-inp" placeholder="Type a note or paste an image (Ctrl+V / Cmd+V)..." data-noteid="'+note.id+'"></textarea>'
+      +'<textarea class="note-body-inp" placeholder="Type a note or paste an image (Ctrl+V / Cmd+V)..." data-noteid="'+note.id+'"'+(note.height?' style="height:'+note.height+'px"':'')+' ></textarea>'
       +'</div>';
   }).join("");
 
@@ -1124,6 +1132,16 @@ function wireNoteEvents() {
       var val = this.value;
       clearTimeout(noteDebounce);
       noteDebounce = setTimeout(function(){ updateNoteBody(nid, val); }, 1500);
+    });
+    // Save height after user finishes resizing (mouseup captures drag-resize end)
+    ta.addEventListener("mouseup", function(){
+      var h = parseInt(this.style.height);
+      if (!isNaN(h) && h > 0) updateNoteHeight(nid, h);
+    });
+    // Also save on blur in case height changed
+    ta.addEventListener("blur", function(){
+      var h = parseInt(this.style.height);
+      if (!isNaN(h) && h > 0) updateNoteHeight(nid, h);
     });
 
     // Paste handler — intercept image pastes
