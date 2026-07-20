@@ -448,7 +448,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 <script>
 
-var API_URL = "https://script.google.com/macros/s/AKfycbzIlDJhtlc9VFFwBFypf04mpkQrrFaY-8lwcCV6iEx8x_fBETc6HlLo6yzviXQlWfGL/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -920,6 +920,12 @@ function setFilter(f) {
 
 function eh(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+// Birthday lookup (must be before renderWeek)
+function getBdayForDate(dateStr) {
+  var mmdd = dateStr.slice(5);
+  return birthdays.filter(function(b){ return b.date === mmdd; });
+}
+
 function renderWeek() {
   var days=getWeekDays(), t=todayStr(), dayNames=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   var fp=days[0].split("-"), lp=days[6].split("-");
@@ -928,7 +934,7 @@ function renderWeek() {
   var ml=(first.getMonth()===last.getMonth())
     ?first.toLocaleDateString("en-US",{month:"long",year:"numeric"})
     :first.toLocaleDateString("en-US",{month:"short"})+" – "+last.toLocaleDateString("en-US",{month:"short",year:"numeric"});
-  document.getElementById("month-label").textContent=ml;
+  var _mlEl=document.getElementById("week-month-label"); if(_mlEl) _mlEl.textContent=ml;
 
   var html="";
   for(var i=0;i<days.length;i++){
@@ -943,7 +949,7 @@ function renderWeek() {
       var name = [b.first, b.last].filter(Boolean).join(" ");
       bdayHtml += '<div class="appt-item appt-bday">'
         +'<div class="appt-dot"></div>'
-        +'<span class="appt-txt">&#127881; '+eh(name)+''s birthday</span>'
+        +'<span class="appt-txt">&#127881; '+eh(name)+'&#39;s birthday</span>'
         +'</div>';
     });
     if(appts.length===0 && bdayHtml === ""){ apptHtml='<div class="appt-empty">—</div>'; }
@@ -1470,12 +1476,6 @@ function closeBdayForm() {
   document.getElementById("bf-last").value  = "";
   document.getElementById("bf-date").value  = "";
   document.getElementById("bf-note").value  = "";
-}
-
-function getBdayForDate(dateStr) {
-  // dateStr is YYYY-MM-DD, match MM-DD
-  var mmdd = dateStr.slice(5);
-  return birthdays.filter(function(b){ return b.date === mmdd; });
 }
 
 function renderBirthdays() {
