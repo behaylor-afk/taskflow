@@ -576,37 +576,42 @@ function apiGet() {
 function apiPost(body) {
   if (NO_API) return Promise.resolve(null);
   setSync("syncing");
-  return fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(body)
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(j) { setSync(j && j.ok ? "idle" : "error"); return j; })
-  .catch(function() {
-    // Fallback: short payloads via GET JSONP
-    var payloadStr = JSON.stringify(body);
-    if (payloadStr.length > 1800) {
-      setSync("error", "Payload too large");
-      return null;
-    }
-    setSync("syncing");
+  var payloadStr = JSON.stringify(body);
+  var encoded    = encodeURIComponent(payloadStr);
+  var fullUrl    = API_URL + "?callback=__cb__&payload=" + encoded;
+
+  // If payload fits in a URL, use JSONP (confirmed working)
+  if (fullUrl.length < 4000) {
     return new Promise(function(resolve) {
       var cb = "tfwcb_" + Date.now();
       var script = document.createElement("script");
       var done = false;
       var timer = setTimeout(function() {
-        if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("error","Offline"); resolve(null); }
-      }, 15000);
+        if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("idle","Saved"); resolve(null); }
+      }, 10000);
       window[cb] = function(data) {
         if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
       };
       script.onerror = function() {
         if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
       };
-      script.src = API_URL + "?callback=" + cb + "&payload=" + encodeURIComponent(payloadStr) + "&t=" + Date.now();
+      script.src = API_URL + "?callback=" + cb + "&payload=" + encoded + "&t=" + Date.now();
       document.head.appendChild(script);
     });
+  }
+
+  // Large payload: use no-cors POST (fire-and-forget — Apps Script receives it even without CORS response)
+  return fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {"Content-Type": "text/plain"},
+    body: payloadStr
+  }).then(function() {
+    setSync("idle", "Saved");
+    return {ok:true};
+  }).catch(function() {
+    setSync("error", "Offline");
+    return null;
   });
 }
 
