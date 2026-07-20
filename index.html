@@ -448,7 +448,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 <script>
 
-var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbyq3YmqLM5tPDBpKyiClfsO7J7IOJdVMpOATdRbRjzuhCYC0pjSwPuW4X_5fXB5tL9G/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -576,53 +576,40 @@ function apiGet() {
 function apiPost(body) {
   if (NO_API) return Promise.resolve(null);
   setSync("syncing");
-  var payloadStr = JSON.stringify(body);
-  var encoded    = encodeURIComponent(payloadStr);
-  var fullUrl    = API_URL + "?callback=__cb__&payload=" + encoded;
-
-  // If payload fits in a URL, use JSONP (confirmed working)
-  if (fullUrl.length < 4000) {
-    return new Promise(function(resolve) {
-      var cb = "tfwcb_" + Date.now();
-      var script = document.createElement("script");
-      var done = false;
-      var timer = setTimeout(function() {
-        if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("idle","Saved"); resolve(null); }
-      }, 10000);
-      window[cb] = function(data) {
-        if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
-      };
-      script.onerror = function() {
-        if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
-      };
-      script.src = API_URL + "?callback=" + cb + "&payload=" + encoded + "&t=" + Date.now();
-      document.head.appendChild(script);
-    });
-  }
-
-  // Large payload: use no-cors POST (fire-and-forget — Apps Script receives it even without CORS response)
-  return fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: {"Content-Type": "text/plain"},
-    body: payloadStr
-  }).then(function() {
-    setSync("idle", "Saved");
-    return {ok:true};
-  }).catch(function() {
-    setSync("error", "Offline");
-    return null;
+  return new Promise(function(resolve) {
+    var cb     = "tfwcb_" + Date.now();
+    var script = document.createElement("script");
+    var done   = false;
+    var timer  = setTimeout(function() {
+      if (!done) { done=true; delete window[cb]; if(script.parentNode) script.remove(); setSync("error","Timeout"); resolve(null); }
+    }, 15000);
+    window[cb] = function(data) {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; if(script.parentNode) script.remove(); setSync(data&&data.ok?"idle":"error"); resolve(data); }
+    };
+    script.onerror = function() {
+      if (!done) { done=true; clearTimeout(timer); delete window[cb]; setSync("error","Offline"); resolve(null); }
+    };
+    script.src = API_URL + "?callback=" + cb + "&payload=" + encodeURIComponent(JSON.stringify(body)) + "&t=" + Date.now();
+    document.head.appendChild(script);
   });
 }
 
 function localSave() {
-  try{ localStorage.setItem("tf-tasks",JSON.stringify(tasks)); localStorage.setItem("tf-appts",JSON.stringify(appointments)); localStorage.setItem("tf-comps",JSON.stringify(completions)); }catch(e){}
+  try{
+    localStorage.setItem("tf-tasks",        JSON.stringify(tasks));
+    localStorage.setItem("tf-appts",        JSON.stringify(appointments));
+    localStorage.setItem("tf-comps",        JSON.stringify(completions));
+    localStorage.setItem("tf-notes",        JSON.stringify(notes));
+    localStorage.setItem("tf-birthdays",    JSON.stringify(birthdays));
+  }catch(e){}
 }
 function localLoad() {
   try{
     tasks=JSON.parse(localStorage.getItem("tf-tasks")||"[]");
     appointments=JSON.parse(localStorage.getItem("tf-appts")||"{}");
     completions=JSON.parse(localStorage.getItem("tf-comps")||"{}");
+    notes=JSON.parse(localStorage.getItem("tf-notes")||"[]");
+    birthdays=JSON.parse(localStorage.getItem("tf-birthdays")||"[]");
     // Ensure subtask completedDates arrays exist
     tasks = tasks.map(function(t) {
       if (!t.subtasks) t.subtasks = [];
