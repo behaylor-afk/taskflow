@@ -1514,17 +1514,23 @@ function renderBirthdays() {
     var mnth = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(b.date.slice(0,2))-1];
     var day  = parseInt(b.date.slice(3));
     return '<tr>'
-      +'<td>'+name+badge+'</td>'
+      +'<td>'+eh(name)+badge+'</td>'
       +'<td>'+mnth+' '+day+'</td>'
-      +'<td style="color:var(--color-text-tertiary)">'+( b.note||'' )+'</td>'
+      +'<td style="color:var(--color-text-tertiary)">'+eh(b.note||'')+'</td>'
       +'<td style="text-align:right;white-space:nowrap">'
-      +'<button onclick="editBirthday(''+b.id+'')" style="background:none;border:0.5px solid var(--color-border);border-radius:var(--radius-sm);padding:.2rem .45rem;cursor:pointer;font-size:.72rem;color:var(--color-text-secondary);margin-right:.3rem">Edit</button>'
-      +'<button onclick="deleteBirthday(''+b.id+'')" style="background:none;border:0.5px solid var(--color-border);border-radius:var(--radius-sm);padding:.2rem .45rem;cursor:pointer;font-size:.72rem;color:var(--color-danger)">Del</button>'
+      +'<button class="bday-edit-btn" data-id="'+b.id+'" style="background:none;border:0.5px solid var(--color-border);border-radius:var(--radius-sm);padding:.2rem .45rem;cursor:pointer;font-size:.72rem;color:var(--color-text-secondary);margin-right:.3rem">Edit</button>'
+      +'<button class="bday-del-btn" data-id="'+b.id+'" style="background:none;border:0.5px solid var(--color-border);border-radius:var(--radius-sm);padding:.2rem .45rem;cursor:pointer;font-size:.72rem;color:var(--color-danger)">Del</button>'
       +'</td>'
       +'</tr>';
   }).join("");
 
   list.innerHTML = '<table class="bday-table"><thead><tr><th>Name</th><th>Date</th><th>Note</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+  list.addEventListener("click", function(e) {
+    var editBtn = e.target.closest(".bday-edit-btn");
+    if (editBtn) { editBirthday(editBtn.getAttribute("data-id")); return; }
+    var delBtn  = e.target.closest(".bday-del-btn");
+    if (delBtn)  { deleteBirthday(delBtn.getAttribute("data-id")); return; }
+  });
 }
 
 </script>
