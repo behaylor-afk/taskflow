@@ -8,6 +8,33 @@
 <title>TaskFlow</title>
 <style>
 
+/* ── Time Block Panel ── */
+#tb-panel{position:fixed;bottom:1.5rem;right:1.5rem;width:280px;background:var(--color-surface);border:0.5px solid var(--color-border-strong);border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:500;display:none;flex-direction:column;max-height:80vh;user-select:none}
+#tb-panel.open{display:flex}
+#tb-header{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:var(--color-accent-mid);border-radius:var(--radius-lg) var(--radius-lg) 0 0;cursor:move;flex-shrink:0}
+#tb-header-title{font-size:.75rem;font-weight:700;color:#fff;letter-spacing:.02em}
+#tb-header-date{font-size:.62rem;color:rgba(255,255,255,.8)}
+#tb-close{background:none;border:none;color:#fff;cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:.8}
+#tb-close:hover{opacity:1}
+#tb-body{overflow-y:auto;flex:1}
+.tb-slot{border-bottom:0.5px solid var(--color-border);min-height:52px}
+.tb-slot.drag-over{background:var(--color-accent-bg)}
+.tb-slot-label{font-size:.65rem;font-weight:600;color:var(--color-text-tertiary);padding:.28rem .6rem .15rem;letter-spacing:.04em;text-transform:uppercase;position:sticky;left:0}
+.tb-slot-tasks{padding:0 .5rem .3rem}
+.tb-task-chip{display:flex;align-items:center;gap:.3rem;padding:.25rem .4rem;margin-bottom:.2rem;background:var(--color-surface-2);border:0.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:.72rem}
+.tb-task-chip.critical{border-left:3px solid var(--color-coral)}
+.tb-task-chip.done-chip{opacity:.5}
+.tb-task-name{flex:1;color:var(--color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-task-chip.done-chip .tb-task-name{text-decoration:line-through;color:var(--color-text-tertiary)}
+.tb-chip-btn{background:none;border:none;cursor:pointer;padding:0;font-size:11px;color:var(--color-text-tertiary);line-height:1;flex-shrink:0}
+.tb-chip-btn:hover{color:var(--color-text-primary)}
+.tb-chip-chk{width:12px;height:12px;border-radius:3px;border:1.5px solid var(--color-border-strong);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0}
+.tb-chip-chk.done{background:var(--color-accent-mid);border-color:var(--color-accent-mid)}
+.tb-empty{font-size:.65rem;color:var(--color-text-tertiary);padding:.15rem .6rem .3rem;font-style:italic}
+#tb-toggle{background:var(--color-accent-mid);color:#fff;border:none;border-radius:var(--radius-md);padding:.35rem .75rem;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.35rem;flex-shrink:0}
+.task-draggable{cursor:grab}
+.task-draggable:active{cursor:grabbing}
+
 /* ── Top Nav ── */
 #top-nav{background:var(--color-surface);border-bottom:0.5px solid var(--color-border);display:flex;align-items:center;gap:0;padding:0 1.25rem;position:sticky;top:0;z-index:200}
 .nav-logo{display:flex;align-items:center;gap:.5rem;padding:.6rem 0;margin-right:1rem;flex-shrink:0}
@@ -321,6 +348,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:.5rem">
+        <button id="tb-toggle" onclick="toggleTimeBlock()">&#9200; Time Block</button>
         <div class="search-wrap">
           <span class="search-icon" style="font-size:12px">🔍</span>
           <input class="search-inp" id="search-inp" placeholder="Search tasks..." autocomplete="off"/>
@@ -389,6 +417,18 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 </div>
 
 <!-- Task Modal -->
+<!-- Time Block Panel -->
+<div id="tb-panel">
+  <div id="tb-header">
+    <div>
+      <div id="tb-header-title">&#9200; Time Block</div>
+      <div id="tb-header-date"></div>
+    </div>
+    <button id="tb-close" onclick="toggleTimeBlock()">&#10005;</button>
+  </div>
+  <div id="tb-body"></div>
+</div>
+
 <div id="modal-bg" class="modal-bg" style="display:none">
   <div class="modal-box">
     <div class="modal-title" id="modal-title">New task</div>
@@ -448,7 +488,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 <script>
 
-var API_URL = "https://script.google.com/macros/s/AKfycbysK6cQv4B6XEfKd-EEKs_8g_hXI30Fu7J_5_9o-lb5eEaXJclHgPDt9ux_-dRR1kdG/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -457,6 +497,10 @@ var completions  = {};
 var curFilter    = "due";
 var expandedTasks = {}; // taskId -> true/false
 var searchQuery   = "";
+var timeBlocks    = {}; // {"HH": ["taskId1","taskId2"]} resets daily
+var tbDate        = "";  // date timeBlocks was last built for
+var tbOpen        = false;
+var tbDragTaskId  = null;
 var notes         = []; // [{id, title, body, order}]
 var birthdays     = []; // [{id, first, last, date:"MM-DD", note}]
 var editingId    = null;
@@ -1330,7 +1374,7 @@ function renderTasks() {
     // Parent is only truly done if all subtasks are also done
     var effectiveDone = done2 && allSubtasksDone(task);
     var chkClass = effectiveDone ? "chkbox checked" : "chkbox";
-    rows+='<tr class="'+rowCls+'">'
+    rows+='<tr class="'+rowCls+' task-draggable" draggable="true" data-taskid="'+task.id+'">'
       +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<span style="pointer-events:none;font-size:10px">✓</span>':'')+'</button></td>'
       +'<td class="td-name">'+highlightMatch(task.name)+critBadge+recBadge+progBadge+expandBtn+'</td>'
       +'<td class="td-ent">'+highlightMatch(task.entity||"")+'</td>'
@@ -1379,8 +1423,204 @@ function renderTasks() {
   area.innerHTML=banner+tableHtml;
 }
 
+
+// ── TIME BLOCK ────────────────────────────────────────────────────────────────
+var TB_HOURS = ["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM"];
+var TB_KEYS  = ["08","09","10","11","12","13","14","15","16","17"];
+
+function loadTimeBlocks() {
+  var stored = localStorage.getItem("tf-timeblocks");
+  var obj    = stored ? JSON.parse(stored) : {};
+  // Reset if stored for a different day
+  if (obj.date !== todayStr()) {
+    timeBlocks = {};
+    TB_KEYS.forEach(function(k){ timeBlocks[k] = []; });
+  } else {
+    timeBlocks = obj.blocks || {};
+    TB_KEYS.forEach(function(k){ if (!timeBlocks[k]) timeBlocks[k] = []; });
+  }
+  tbDate = todayStr();
+}
+
+function saveTimeBlocks() {
+  localStorage.setItem("tf-timeblocks", JSON.stringify({date: todayStr(), blocks: timeBlocks}));
+}
+
+function toggleTimeBlock() {
+  tbOpen = !tbOpen;
+  var panel = document.getElementById("tb-panel");
+  if (tbOpen) {
+    panel.classList.add("open");
+    renderTimeBlock();
+  } else {
+    panel.classList.remove("open");
+  }
+}
+
+function renderTimeBlock() {
+  var panel = document.getElementById("tb-panel");
+  if (!panel || !tbOpen) return;
+
+  // Set date label
+  var dl = document.getElementById("tb-header-date");
+  if (dl) dl.textContent = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+
+  var body = document.getElementById("tb-body");
+  if (!body) return;
+
+  var html = "";
+  TB_HOURS.forEach(function(label, i) {
+    var key   = TB_KEYS[i];
+    var slots = timeBlocks[key] || [];
+    // Filter to tasks that still exist
+    var validIds = slots.filter(function(id){ return tasks.find(function(t){return t.id===id;}); });
+    if (validIds.length !== slots.length) { timeBlocks[key] = validIds; saveTimeBlocks(); }
+
+    var chipHtml = validIds.length === 0
+      ? '<div class="tb-empty">Drop task here</div>'
+      : validIds.map(function(id) {
+          var task = tasks.find(function(t){return t.id===id;});
+          if (!task) return "";
+          var done = isCompleted(id);
+          var cls  = "tb-task-chip" + (task.critical?" critical":"") + (done?" done-chip":"");
+          var chkCls = "tb-chip-chk" + (done?" done":"");
+          return '<div class="'+cls+'">'
+            +'<button class="'+chkCls+'" data-tbid="'+id+'" title="Complete">'+( done?"&#10003;":"" )+'</button>'
+            +'<span class="tb-task-name" title="'+eh(task.name)+'">'+eh(task.name)+'</span>'
+            +'<button class="tb-chip-btn tb-edit-btn" data-tbid="'+id+'" title="Edit">&#9998;</button>'
+            +'<button class="tb-chip-btn tb-remove-btn" data-tbid="'+id+'" data-tbkey="'+key+'" title="Remove from slot">&#10005;</button>'
+            +'</div>';
+        }).join("");
+
+    html += '<div class="tb-slot" data-tbkey="'+key+'">'
+      +'<div class="tb-slot-label">'+label+'</div>'
+      +'<div class="tb-slot-tasks">'+chipHtml+'</div>'
+      +'</div>';
+  });
+
+  body.innerHTML = html;
+  wireTbEvents();
+}
+
+function wireTbEvents() {
+  var body = document.getElementById("tb-body");
+  if (!body) return;
+
+  // Slot drop targets
+  body.querySelectorAll(".tb-slot").forEach(function(slot) {
+    slot.addEventListener("dragover", function(e) {
+      if (!tbDragTaskId) return;
+      e.preventDefault();
+      body.querySelectorAll(".tb-slot").forEach(function(s){ s.classList.remove("drag-over"); });
+      slot.classList.add("drag-over");
+    });
+    slot.addEventListener("dragleave", function() { slot.classList.remove("drag-over"); });
+    slot.addEventListener("drop", function(e) {
+      e.preventDefault();
+      slot.classList.remove("drag-over");
+      if (!tbDragTaskId) return;
+      var key = slot.getAttribute("data-tbkey");
+      // Remove from any existing slot first
+      TB_KEYS.forEach(function(k){
+        timeBlocks[k] = (timeBlocks[k]||[]).filter(function(id){return id!==tbDragTaskId;});
+      });
+      if (!timeBlocks[key]) timeBlocks[key] = [];
+      if (timeBlocks[key].indexOf(tbDragTaskId) === -1) timeBlocks[key].push(tbDragTaskId);
+      saveTimeBlocks();
+      tbDragTaskId = null;
+      renderTimeBlock();
+    });
+  });
+
+  // Chip buttons via delegation
+  body.addEventListener("click", function(e) {
+    var chk = e.target.closest(".tb-chip-chk");
+    if (chk) { toggleComplete(chk.getAttribute("data-tbid")); renderTimeBlock(); return; }
+    var edit = e.target.closest(".tb-edit-btn");
+    if (edit) {
+      var id = edit.getAttribute("data-tbid");
+      var task = tasks.find(function(t){return t.id===id;});
+      if (task) openModal(task);
+      return;
+    }
+    var remove = e.target.closest(".tb-remove-btn");
+    if (remove) {
+      var key = remove.getAttribute("data-tbkey");
+      var id  = remove.getAttribute("data-tbid");
+      timeBlocks[key] = (timeBlocks[key]||[]).filter(function(i){return i!==id;});
+      saveTimeBlocks();
+      renderTimeBlock();
+      return;
+    }
+  });
+}
+
+// Make panel draggable
+(function() {
+  var panel, isDragging = false, startX, startY, startLeft, startBottom;
+  document.addEventListener("DOMContentLoaded", function() {
+    panel = document.getElementById("tb-panel");
+    var header = document.getElementById("tb-header");
+    if (!header) return;
+    header.addEventListener("mousedown", function(e) {
+      if (e.target.closest("#tb-close")) return;
+      isDragging = true;
+      var rect = panel.getBoundingClientRect();
+      startX    = e.clientX;
+      startY    = e.clientY;
+      startLeft = rect.left;
+      startBottom = window.innerHeight - rect.bottom;
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", function(e) {
+      if (!isDragging) return;
+      var dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      var newLeft   = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  startLeft   + dx));
+      var newBottom = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, startBottom - dy));
+      panel.style.left   = newLeft   + "px";
+      panel.style.bottom = newBottom + "px";
+      panel.style.right  = "auto";
+    });
+    document.addEventListener("mouseup", function() { isDragging = false; });
+    // Touch support
+    header.addEventListener("touchstart", function(e) {
+      if (e.target.closest("#tb-close")) return;
+      var touch = e.touches[0];
+      isDragging = true;
+      var rect  = panel.getBoundingClientRect();
+      startX    = touch.clientX;
+      startY    = touch.clientY;
+      startLeft = rect.left;
+      startBottom = window.innerHeight - rect.bottom;
+    }, {passive:true});
+    document.addEventListener("touchmove", function(e) {
+      if (!isDragging) return;
+      var touch = e.touches[0];
+      var dx = touch.clientX - startX;
+      var dy = touch.clientY - startY;
+      var newLeft   = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  startLeft   + dx));
+      var newBottom = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, startBottom - dy));
+      panel.style.left   = newLeft   + "px";
+      panel.style.bottom = newBottom + "px";
+      panel.style.right  = "auto";
+    }, {passive:true});
+    document.addEventListener("touchend", function() { isDragging = false; });
+  });
+})();
+
 function renderAll() { renderWeek(); renderTasks(); if(currentPage==="notes") renderNotes(); }
 
+document.getElementById("task-area").addEventListener("dragstart", function(e) {
+  var row = e.target.closest("[data-taskid]");
+  if (row) {
+    tbDragTaskId = row.getAttribute("data-taskid");
+    e.dataTransfer.effectAllowed = "copy";
+  }
+});
+document.getElementById("task-area").addEventListener("dragend", function() {
+  tbDragTaskId = null;
+});
 document.getElementById("task-area").addEventListener("click",function(e){
   // Critical star toggle
   var critBtn=e.target.closest(".critical-toggle");
@@ -1436,6 +1676,7 @@ document.getElementById("subtask-list-edit").addEventListener("click",function(e
 
 document.getElementById("today-str").textContent=new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
 
+loadTimeBlocks();
 loadData();
 
 // ── PAGE NAV ─────────────────────────────────────────────────────────────────
