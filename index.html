@@ -18,6 +18,7 @@
 #tb-close:hover{opacity:1}
 #tb-body{overflow-y:auto;flex:1}
 .tb-slot{border-bottom:0.5px solid var(--color-border);min-height:52px}
+.tb-appt-chip{border-left:3px solid var(--color-accent-mid)}
 .tb-slot.drag-over{background:var(--color-accent-bg)}
 .tb-slot-label{font-size:.65rem;font-weight:600;color:var(--color-text-tertiary);padding:.28rem .6rem .15rem;letter-spacing:.04em;text-transform:uppercase;position:sticky;left:0}
 .tb-slot-tasks{padding:0 .5rem .3rem}
@@ -674,6 +675,10 @@ function loadData() {
     if(!data||!data.ok){ setSync(NO_API?"idle":"error",NO_API?"Local only":"Offline"); return; }
     // Preserve local state before sheet overwrites
     var localDoneMap = {};
+    var localSubDone = {};
+    tasks.forEach(function(lt) {
+      (lt.subtasks||[]).forEach(function(ls) { if (isSubtaskDone(ls)) localSubDone[lt.id+"|"+ls.id] = true; });
+    });
     var localCompletedTodayMap = {};
     var t = todayStr();
     tasks.forEach(function(lt) {
@@ -695,6 +700,8 @@ function loadData() {
     // Ensure every subtask has a completedDates array
     t.subtasks = t.subtasks.map(function(st) {
       if (!st.completedDates) st.completedDates = [];
+      if (localSubDone[t.id+"|"+st.id]) st.done = true;
+      st.done = isSubtaskDone(st);
       return st;
     });
     // Normalize permanentlyDone - preserve local state if sheet hasn't caught up yet
@@ -786,7 +793,7 @@ function spawnNextOccurrence(task) {
   if(!exists){
     // Carry subtasks forward, reset all their completedDates
     var nextSubtasks = (task.subtasks||[]).map(function(st){
-      return {id:makeUUID(), name:st.name, completedDates:[]};
+      return {id:makeUUID(), name:st.name, done:false, completedDates:[]};
     });
     var nt={id:makeUUID(),name:task.name,entity:task.entity,startDate:nextStart,dueDate:nextDue,recurrence:task.recurrence,completedDates:[],subtasks:nextSubtasks,critical:false,permanentlyDone:false};
     tasks.push(nt); apiPost({action:"saveTask",task:nt});
@@ -803,16 +810,14 @@ function toggleSubtask(taskId, subtaskId) {
   if (!task || !task.subtasks) return;
   var st = task.subtasks.find(function(s){return s.id===subtaskId;});
   if (!st) return;
-  if (!st.completedDates) st.completedDates = [];
-  var t = todayStr();
-  var idx = st.completedDates.indexOf(t);
-  if (idx >= 0) st.completedDates.splice(idx, 1);
-  else st.completedDates.push(t);
+  var nowDone = !isSubtaskDone(st);
+  st.done = nowDone;
+  st.completedDates = nowDone ? [todayStr()] : [];
   localSave(); renderAll(); apiPost({action:"saveTask", task:task});
 }
 
 function isSubtaskDone(st) {
-  return st.completedDates && st.completedDates.indexOf(todayStr()) >= 0;
+  return !!st.done || !!(st.completedDates && st.completedDates.length > 0);
 }
 
 function getSubtaskProgress(task) {
@@ -1034,11 +1039,14 @@ function renderWeek() {
     if (!item) return;
     dragSrcDate = item.getAttribute("data-date");
     dragSrcIdx  = parseInt(item.getAttribute("data-idx"), 10);
+    var _al = (appointments[dragSrcDate]||[])[dragSrcIdx];
+    tbDragTaskId = (_al !== undefined) ? "appt:" + _al : null;
     item.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
   });
 
   weekGrid.addEventListener("dragend", function() {
+    tbDragTaskId = null;
     weekGrid.querySelectorAll(".appt-item").forEach(function(el) {
       el.classList.remove("dragging","drag-over-top","drag-over-bottom");
     });
@@ -1473,12 +1481,18 @@ function renderTimeBlock() {
     var key   = TB_KEYS[i];
     var slots = timeBlocks[key] || [];
     // Filter to tasks that still exist
-    var validIds = slots.filter(function(id){ return tasks.find(function(t){return t.id===id;}); });
+    var validIds = slots.filter(function(id){ return id.indexOf("appt:")===0 || tasks.find(function(t){return t.id===id;}); });
     if (validIds.length !== slots.length) { timeBlocks[key] = validIds; saveTimeBlocks(); }
 
     var chipHtml = validIds.length === 0
       ? '<div class="tb-empty">Drop task here</div>'
       : validIds.map(function(id) {
+          if (id.indexOf("appt:")===0) {
+            return '<div class="tb-task-chip tb-appt-chip">'
+              +'<span class="tb-task-name" title="'+eh(id.slice(5))+'">&#128197; '+eh(id.slice(5))+'</span>'
+              +'<button class="tb-chip-btn tb-remove-btn" data-tbid="'+eh(id)+'" data-tbkey="'+key+'" title="Remove from slot">&#10005;</button>'
+              +'</div>';
+          }
           var task = tasks.find(function(t){return t.id===id;});
           if (!task) return "";
           var done = isCompleted(id);
