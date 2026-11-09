@@ -18,6 +18,9 @@
 #tb-close:hover{opacity:1}
 #tb-body{overflow-y:auto;flex:1}
 .tb-slot{border-bottom:0.5px solid var(--color-border);min-height:52px}
+.tb-badge{margin-left:.35rem;font-size:.7rem;color:#BA7517}
+tbody tr.in-tb td{background:rgba(239,159,39,.16)!important}
+tbody tr.in-tb td:first-child{box-shadow:inset 3px 0 0 var(--color-accent-mid)}
 .tb-appt-chip{border-left:3px solid var(--color-accent-mid)}
 .tb-slot.drag-over{background:var(--color-accent-bg)}
 .tb-slot-label{font-size:.65rem;font-weight:600;color:var(--color-text-tertiary);padding:.28rem .6rem .15rem;letter-spacing:.04em;text-transform:uppercase;position:sticky;left:0}
@@ -1382,9 +1385,10 @@ function renderTasks() {
     // Parent is only truly done if all subtasks are also done
     var effectiveDone = done2 && allSubtasksDone(task);
     var chkClass = effectiveDone ? "chkbox checked" : "chkbox";
-    rows+='<tr class="'+rowCls+' task-draggable" draggable="true" data-taskid="'+task.id+'">'
+    var inTb = isInTimeBlock(task.id);
+    rows+='<tr class="'+rowCls+(inTb?' in-tb':'')+' task-draggable" draggable="true" data-taskid="'+task.id+'">'
       +'<td class="td-chk"><button class="'+chkClass+'" data-id="'+task.id+'">'+(effectiveDone?'<span style="pointer-events:none;font-size:10px">✓</span>':'')+'</button></td>'
-      +'<td class="td-name">'+highlightMatch(task.name)+critBadge+recBadge+progBadge+expandBtn+'</td>'
+      +'<td class="td-name">'+highlightMatch(task.name)+(inTb?'<span class="tb-badge" title="On today\'s time block">&#9201;</span>':'')+critBadge+recBadge+progBadge+expandBtn+'</td>'
       +'<td class="td-ent">'+highlightMatch(task.entity||"")+'</td>'
       +'<td class="td-start">'+fmtDate(task.startDate)+'</td>'
       +'<td class="td-due"><span class="'+chipCls+'">'+fmtDate(task.dueDate)+'</span></td>'
@@ -1452,6 +1456,14 @@ function loadTimeBlocks() {
 
 function saveTimeBlocks() {
   localStorage.setItem("tf-timeblocks", JSON.stringify({date: todayStr(), blocks: timeBlocks}));
+  if (typeof renderTasks === "function") renderTasks();
+}
+function isInTimeBlock(id) {
+  if (!TB_KEYS || !timeBlocks) return false;
+  for (var i=0;i<TB_KEYS.length;i++) {
+    if ((timeBlocks[TB_KEYS[i]]||[]).indexOf(id) !== -1) return true;
+  }
+  return false;
 }
 
 function toggleTimeBlock() {
