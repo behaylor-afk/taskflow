@@ -492,7 +492,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 <script>
 
-var API_URL = "https://script.google.com/macros/s/AKfycbzeBKpEgrt54OMUycio5ItJrdybAf5BfFQZtzWDzgjxD2HNnHmCnuYBn7_k__kdL_w/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzalt6DdEUSGk77YrhFh48yfhrHu2-UWfFPa2tnuzjBFxdm5RKtxtPwfi7kXhJMW5wK/exec";
 var NO_API  = !API_URL || API_URL === "YOUR_APPS_SCRIPT_URL_HERE";
 
 var tasks        = [];
@@ -730,7 +730,7 @@ Object.keys(rawAppts).forEach(function(k) {
   normAppts[normalizeDate(k)] = rawAppts[k];
 });
 appointments = normAppts;
-    if (data.notes) { notes = data.notes; }
+    if (data.notes && (data.notes.length > 0 || notes.length === 0)) { notes = data.notes; }
     if (data.birthdays) { birthdays = data.birthdays; }
     localSave(); setSync("idle"); renderAll();
   });
@@ -1083,9 +1083,25 @@ function renderWeek() {
 }
 
 // ── NOTES ──────────────────────────────────────────────────────────────────
+var notesSaving = false, notesPending = false;
 function saveNotes() {
   localSave();
-  apiPost({action:"saveNotes", notes:notes});
+  if (notesSaving) { notesPending = true; return; }
+  syncNotes();
+}
+function syncNotes() {
+  notesSaving = true; notesPending = false;
+  var s = JSON.stringify(notes), parts = [], CH = 3500;
+  for (var k = 0; k < s.length; k += CH) parts.push(s.slice(k, k + CH));
+  if (!parts.length) parts = ["[]"];
+  var i = 0;
+  (function next() {
+    if (i >= parts.length) { notesSaving = false; if (notesPending) syncNotes(); return; }
+    apiPost({action:"saveNotesChunk", i:i, n:parts.length, part:parts[i]}).then(function(r) {
+      if (!r || !r.ok) { notesSaving = false; return; }
+      i++; next();
+    });
+  })();
 }
 
 function addNote() {
