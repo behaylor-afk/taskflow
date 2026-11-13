@@ -312,6 +312,35 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
   table{table-layout:auto}
 }
 
+
+#tl-bg{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:1rem}
+#tl-bg.open{display:flex}
+#tl-modal{background:var(--color-surface);border-radius:var(--radius-lg);box-shadow:0 12px 48px rgba(0,0,0,.25);width:min(860px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+#tl-head{display:flex;align-items:center;gap:.5rem;padding:.6rem .9rem;background:var(--color-accent-mid);color:#fff;flex-shrink:0}
+#tl-head .tl-title{font-size:.85rem;font-weight:700;flex:1}
+#tl-head button{background:rgba(255,255,255,.22);border:none;color:#fff;border-radius:6px;padding:.2rem .55rem;font-size:.75rem;cursor:pointer}
+#tl-head button:hover{background:rgba(255,255,255,.35)}
+#tl-head #tl-date{font-size:.8rem;font-weight:600;min-width:9.5rem;text-align:center}
+#tl-main{display:flex;flex:1;min-height:0;flex-wrap:wrap;overflow-y:auto}
+#tl-gridwrap{flex:2 1 360px;min-height:300px;max-height:calc(92vh - 3rem);overflow-y:auto;position:relative;border-right:0.5px solid var(--color-border)}
+#tl-grid{position:relative;user-select:none;-webkit-user-select:none}
+.tl-row{display:flex;height:22px;border-bottom:0.5px solid var(--color-border)}
+.tl-row.hr{border-bottom-color:var(--color-border-strong)}
+.tl-lbl{width:60px;flex-shrink:0;font-size:.62rem;color:var(--color-text-tertiary);padding:3px 6px 0 0;text-align:right;touch-action:pan-y}
+.tl-cell{flex:1;touch-action:none;cursor:crosshair}
+.tl-cell:hover{background:var(--color-accent-bg)}
+.tl-sel{position:absolute;left:64px;right:4px;background:rgba(239,159,39,.3);border:1px dashed var(--color-accent-mid);border-radius:4px;pointer-events:none}
+.tl-block{position:absolute;left:64px;right:4px;border-radius:5px;border-left:4px solid;padding:2px 22px 0 6px;overflow:hidden;box-sizing:border-box}
+.tl-block input{width:100%;border:none;background:transparent;font-size:.74rem;font-family:inherit;color:var(--color-text-primary);outline:none;padding:1px 0}
+.tl-block .tl-dur{font-size:.6rem;color:var(--color-text-secondary)}
+.tl-block .tl-x{position:absolute;top:1px;right:4px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--color-text-tertiary);padding:0}
+.tl-block .tl-rs{position:absolute;left:0;right:0;bottom:0;height:9px;cursor:ns-resize;touch-action:none;background:linear-gradient(transparent,rgba(0,0,0,.14))}
+#tl-sum{flex:1 1 220px;padding:.75rem .9rem;overflow-y:auto;max-height:calc(92vh - 3rem)}
+#tl-sum h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-tertiary);margin:0 0 .5rem}
+.tl-sr{margin-bottom:.55rem;font-size:.74rem}
+.tl-sr .tl-sn{display:flex;justify-content:space-between;gap:.5rem}
+.tl-sr .tl-bar{height:6px;border-radius:3px;margin-top:2px}
+.tl-hint{font-size:.7rem;color:var(--color-text-tertiary);margin-top:.75rem;line-height:1.4}
 </style>
 </head>
 <body>
@@ -353,6 +382,7 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
       </div>
       <div style="display:flex;align-items:center;gap:.5rem">
         <button id="tb-toggle" onclick="toggleTimeBlock()">&#9200; Time Block</button>
+        <button id="tl-toggle" class="btn-sec" onclick="openTimeLog()" style="background:var(--color-surface);color:var(--color-text-primary);border:0.5px solid var(--color-border-strong);border-radius:var(--radius-md);padding:.35rem .75rem;font-size:.75rem;font-weight:600;cursor:pointer;flex-shrink:0">&#128221; Time Log</button>
         <div class="search-wrap">
           <span class="search-icon" style="font-size:12px">🔍</span>
           <input class="search-inp" id="search-inp" placeholder="Search tasks..." autocomplete="off"/>
@@ -422,6 +452,22 @@ tbody tr.row-critical td:first-child{padding-left:calc(.6rem - 3px)}
 
 <!-- Task Modal -->
 <!-- Time Block Panel -->
+<div id="tl-bg">
+  <div id="tl-modal">
+    <div id="tl-head">
+      <span class="tl-title">&#128221; Time Log</span>
+      <button id="tl-prev">&#9664;</button>
+      <span id="tl-date"></span>
+      <button id="tl-next">&#9654;</button>
+      <button id="tl-today">Today</button>
+      <button id="tl-close">&#10005;</button>
+    </div>
+    <div id="tl-main">
+      <div id="tl-gridwrap"><div id="tl-grid"></div></div>
+      <div id="tl-sum"></div>
+    </div>
+  </div>
+</div>
 <div id="tb-panel">
   <div id="tb-header">
     <div>
@@ -1845,6 +1891,212 @@ function renderBirthdays() {
   });
 }
 
+
+// ── TIME LOG (15-minute activity log) ──────────────────────────────────────
+(function() {
+  var START_H = 6, END_H = 21, ROW = 22;
+  var NSLOTS = (END_H - START_H) * 4;
+  var COLORS = ["#EF9F27","#4C9A8B","#6C8EBF","#C97B84","#8E7CC3","#7FA650","#D17A3F","#5BA3B5"];
+  var logDate = null, store = {};
+
+  function load() { try { store = JSON.parse(localStorage.getItem("tf-timelog")||"{}"); } catch(e) { store = {}; } }
+  function save() { try { localStorage.setItem("tf-timelog", JSON.stringify(store)); } catch(e) {} }
+  function blocks() { if (!store[logDate]) store[logDate] = []; return store[logDate]; }
+  function uid() { return "tl" + Date.now().toString(36) + Math.floor(Math.random()*1e5).toString(36); }
+  function slotLabel(s) {
+    var m = START_H*60 + s*15, h = Math.floor(m/60), mm = m%60, ap = h>=12?"pm":"am";
+    var h12 = h%12 || 12;
+    return h12 + ":" + (mm<10?"0":"") + mm + ap;
+  }
+  function fmtDur(n) { var m = n*15, h = Math.floor(m/60), r = m%60; return (h?h+"h":"") + (h&&r?" ":"") + (r?r+"m":""); }
+  function colorFor(t) {
+    var k = (t||"").trim().toLowerCase(), h = 0;
+    for (var i=0;i<k.length;i++) h = (h*31 + k.charCodeAt(i)) >>> 0;
+    return COLORS[h % COLORS.length];
+  }
+  function occupiedBy(slot, ignoreId) {
+    var b = blocks();
+    for (var i=0;i<b.length;i++) if (b[i].id!==ignoreId && slot>=b[i].s && slot<b[i].e) return b[i];
+    return null;
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  function render() {
+    var d = new Date(logDate + "T12:00:00");
+    el("tl-date").textContent = d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+    var grid = el("tl-grid");
+    grid.style.height = (NSLOTS*ROW) + "px";
+    var h = "";
+    for (var s=0; s<NSLOTS; s++) {
+      var onHour = s%4===0;
+      h += '<div class="tl-row'+(((s+1)%4===0)?" hr":"")+'" data-slot="'+s+'"><div class="tl-lbl">'+(onHour?slotLabel(s):"")+'</div><div class="tl-cell" data-slot="'+s+'"></div></div>';
+    }
+    grid.innerHTML = h;
+    blocks().forEach(function(b) {
+      var div = document.createElement("div");
+      div.className = "tl-block";
+      div.setAttribute("data-id", b.id);
+      var col = colorFor(b.t);
+      div.style.top = (b.s*ROW+1) + "px";
+      div.style.height = ((b.e-b.s)*ROW-2) + "px";
+      div.style.borderLeftColor = col;
+      div.style.background = col + "26";
+      var inp = document.createElement("input");
+      inp.type = "text"; inp.value = b.t || ""; inp.placeholder = "What did you do?";
+      inp.addEventListener("input", function() { b.t = inp.value; save(); renderSummary(); });
+      inp.addEventListener("blur", function() { render(); });
+      inp.addEventListener("keydown", function(e) { if (e.key==="Enter") inp.blur(); });
+      var dur = document.createElement("div");
+      dur.className = "tl-dur";
+      dur.textContent = slotLabel(b.s) + " – " + slotLabel(b.e) + " · " + fmtDur(b.e-b.s);
+      var x = document.createElement("button");
+      x.className = "tl-x"; x.innerHTML = "&#10005;"; x.title = "Delete";
+      x.addEventListener("click", function() {
+        store[logDate] = blocks().filter(function(o){return o.id!==b.id;});
+        save(); render();
+      });
+      var rs = document.createElement("div");
+      rs.className = "tl-rs"; rs.title = "Drag to resize";
+      rs.addEventListener("pointerdown", function(e) { startResize(e, b, div); });
+      div.appendChild(inp);
+      if (b.e-b.s >= 2) div.appendChild(dur);
+      div.appendChild(x);
+      div.appendChild(rs);
+      grid.appendChild(div);
+    });
+    renderSummary();
+  }
+
+  function renderSummary() {
+    var tot = {}, order = [], all = 0;
+    blocks().forEach(function(b) {
+      var name = (b.t||"").trim() || "(untitled)";
+      var k = name.toLowerCase();
+      if (!tot[k]) { tot[k] = {name:name, n:0}; order.push(k); }
+      tot[k].n += (b.e-b.s); all += (b.e-b.s);
+    });
+    order.sort(function(a,b){ return tot[b].n - tot[a].n; });
+    var h = '<h4>Where your time went</h4>';
+    if (!order.length) {
+      h += '<div class="tl-hint">Nothing logged for this day yet.</div>';
+    } else {
+      h += '<div style="font-size:.78rem;font-weight:600;margin-bottom:.6rem">Total logged: '+fmtDur(all)+'</div>';
+      order.forEach(function(k) {
+        var t = tot[k], pct = Math.round(t.n/all*100);
+        var n = document.createElement("span"); n.textContent = t.name;
+        h += '<div class="tl-sr"><div class="tl-sn"><span>'+n.innerHTML+'</span><span style="color:var(--color-text-secondary);white-space:nowrap">'+fmtDur(t.n)+' · '+pct+'%</span></div>'
+          +'<div class="tl-bar" style="width:'+pct+'%;background:'+colorFor(t.name)+'"></div></div>';
+      });
+    }
+    h += '<div class="tl-hint">Drag down on the grid to mark a block of time, then type what you did. Drag the bottom edge of a block to resize it. Blocks with the same name are added together.</div>';
+    el("tl-sum").innerHTML = h;
+  }
+
+  // ── create by dragging on empty cells
+  var sel = null;
+  function cellSlot(e) {
+    var grid = el("tl-grid"), r = grid.getBoundingClientRect();
+    var s = Math.floor((e.clientY - r.top) / ROW);
+    return Math.max(0, Math.min(NSLOTS-1, s));
+  }
+  function drawSel() {
+    var old = el("tl-selbox"); if (old) old.remove();
+    if (!sel) return;
+    var a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+    var d = document.createElement("div");
+    d.id = "tl-selbox"; d.className = "tl-sel";
+    d.style.top = (a*ROW) + "px"; d.style.height = ((b-a+1)*ROW) + "px";
+    el("tl-grid").appendChild(d);
+  }
+  function wire() {
+    var grid = el("tl-grid");
+    grid.addEventListener("pointerdown", function(e) {
+      var cell = e.target.closest(".tl-cell");
+      if (!cell) return;
+      var s = parseInt(cell.getAttribute("data-slot"),10);
+      if (occupiedBy(s)) return;
+      sel = {a:s, b:s};
+      try { grid.setPointerCapture(e.pointerId); } catch(x) {}
+      drawSel();
+      e.preventDefault();
+    });
+    grid.addEventListener("pointermove", function(e) {
+      if (!sel) return;
+      var s = cellSlot(e), dir = s >= sel.a ? 1 : -1, cur = sel.a;
+      // extend until hitting an existing block
+      while (cur !== s) {
+        var nx = cur + dir;
+        if (occupiedBy(nx)) break;
+        cur = nx;
+      }
+      sel.b = cur; drawSel();
+    });
+    function finish() {
+      if (!sel) return;
+      var a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b) + 1;
+      sel = null;
+      var nb = {id:uid(), s:a, e:b, t:""};
+      blocks().push(nb); save(); render();
+      var inp = el("tl-grid").querySelector('.tl-block[data-id="'+nb.id+'"] input');
+      if (inp) inp.focus();
+    }
+    grid.addEventListener("pointerup", finish);
+    grid.addEventListener("pointercancel", function(){ sel = null; drawSel(); });
+  }
+
+  // ── resize a block by its bottom edge
+  function startResize(e, b, div) {
+    e.preventDefault(); e.stopPropagation();
+    var target = e.target;
+    try { target.setPointerCapture(e.pointerId); } catch(x) {}
+    var maxE = NSLOTS;
+    blocks().forEach(function(o) { if (o.id!==b.id && o.s>=b.e && o.s<maxE) maxE = o.s; });
+    function mv(ev) {
+      var r = el("tl-grid").getBoundingClientRect();
+      var ne = Math.round((ev.clientY - r.top) / ROW);
+      ne = Math.max(b.s+1, Math.min(maxE, ne));
+      if (ne !== b.e) { b.e = ne; div.style.height = ((b.e-b.s)*ROW-2) + "px"; }
+    }
+    function up() {
+      target.removeEventListener("pointermove", mv);
+      target.removeEventListener("pointerup", up);
+      save(); render();
+    }
+    target.addEventListener("pointermove", mv);
+    target.addEventListener("pointerup", up);
+  }
+
+  function shiftDay(n) {
+    var d = new Date(logDate + "T12:00:00"); d.setDate(d.getDate()+n);
+    logDate = localDateStr(d); render();
+  }
+
+  window.openTimeLog = function() {
+    load();
+    if (!logDate) logDate = todayStr();
+    el("tl-bg").classList.add("open");
+    render();
+    // scroll to ~8am or current hour
+    var h = new Date().getHours(); if (h < START_H || h >= END_H) h = 8;
+    el("tl-gridwrap").scrollTop = Math.max(0, (h-START_H-1)*4*ROW);
+  };
+  function closeLog() { el("tl-bg").classList.remove("open"); }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    wire();
+    el("tl-close").addEventListener("click", closeLog);
+    el("tl-bg").addEventListener("mousedown", function(e) { if (e.target === el("tl-bg")) closeLog(); });
+    el("tl-prev").addEventListener("click", function(){ shiftDay(-1); });
+    el("tl-next").addEventListener("click", function(){ shiftDay(1); });
+    el("tl-today").addEventListener("click", function(){ logDate = todayStr(); render(); });
+  });
+  if (document.readyState !== "loading") { wire(); el("tl-close").addEventListener("click", closeLog);
+    el("tl-bg").addEventListener("mousedown", function(e){ if (e.target===el("tl-bg")) closeLog(); });
+    el("tl-prev").addEventListener("click", function(){ shiftDay(-1); });
+    el("tl-next").addEventListener("click", function(){ shiftDay(1); });
+    el("tl-today").addEventListener("click", function(){ logDate = todayStr(); render(); }); }
+})();
 </script>
 </body>
 </html>
